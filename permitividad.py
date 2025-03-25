@@ -15,8 +15,6 @@ T=2*np.sqrt(EPS0)/(np.sqrt(EPS0)+np.sqrt(EPS1))
 def gaussian_pulse(x, x0, sigma):
     return np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
 
-
-
 # x = np.linspace(0, 100, 1001)
 # plt.plot(x, gaussian_pulse(x, 50, 10))
 
@@ -40,14 +38,14 @@ def fdtd_1d_solver(initial_condition, xE, dt, Tf, nx, L, d):
         e[1:nx1] = e[1:nx1] - dt / dx / EPS0 * (h[1:nx1] - h[:nx1-1])
         e[nx1:-1] = e[nx1:-1] - dt / dx / EPS1 * (h[nx1:] - h[nx1-1:-1])
 
-        #e[nx1+1:-1] = e[nx1+1:-1] - dt / dx / EPS1 * (h[nx1+1:] - h[nx1:-1])
-        plt.plot(xE, e)
-        plt.axvline(x=L/2-d, color='grey', linestyle='--')
-        plt.pause(0.001)
-        plt.cla()
+        #For debugging
+        # plt.plot(xE, e)
+        # plt.axvline(x=L/2-d, color='grey', linestyle='--')
+        # plt.pause(0.001)
+        # plt.cla()
     return e
 
-def test_fdtd_1d_solver():
+def test_fdtd_1d_solver_permitivity():
     nx = 1001
     L=10
     d=2
@@ -68,7 +66,6 @@ def test_fdtd_1d_solver():
     expected_condition[:nx1] = \
         0.5 * gaussian_pulse(xE[:nx1], x0 - C0 * Tf, sigma) + \
         0.5 * R * gaussian_pulse(xE[:nx1], L/2-d - C0 * (Tf-(L/2-d)/C0) , sigma)
-    print((Tf-(L/2-d)/C0))
     expected_condition[nx1+1:] = \
         0.5 * T * gaussian_pulse(xE[nx1+1:], L/2-d + C1 * (Tf-(L/2-d)/C0), sigma*np.sqrt(EPS0/EPS1)) \
 
@@ -80,9 +77,7 @@ def test_fdtd_1d_solver():
     plt.legend()
     plt.show()
 
-
     assert np.corrcoef(final_condition, expected_condition)[0,1] >= 0.99
-    
 
 if __name__ == "__main__":
-    test_fdtd_1d_solver()
+    test_fdtd_1d_solver_permitivity()
