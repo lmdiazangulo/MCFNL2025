@@ -45,6 +45,26 @@ def test_fdtd_1d_solver_pec():
 
     assert np.corrcoef(final_condition, expected_condition)[0, 1] >= 0.99
 
+def test_fdtd_pmc_conditions():
+    nx = 101
+    xE = np.linspace(-5, 5, nx)
+    x0 = 0.0
+    sigma = 0.5
+    
+    dx = xE[1] - xE[0]
+    dt = 0.5 * dx / C0
+    Tf =np.max(xE) - np.min(xE)/ C0
+    
+
+    initial_e = gaussian_pulse(xE, x0, sigma)
+    solver = FDTD1D(xE, bounds=('pmc', 'pmc'))
+    solver.set_initial_condition(initial_e)
+    solved_e = solver.run_until(Tf, dt)
+
+    expected_condition = initial_e
+
+    assert np.corrcoef(solved_e, expected_condition)[0,1] >= 0.99
+
 
 def test_fdtd_mur_conditions():
     """Test that Mur boundary conditions properly absorb the field."""
