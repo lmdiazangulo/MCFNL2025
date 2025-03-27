@@ -58,6 +58,8 @@ class FDTD1D:
         elif self.bounds[0] == 'mur':
             self.e[0] = self.e_old_left + (C0*dt - self.dx) / \
                 (C0*dt + self.dx)*(self.e[1] - self.e[0])
+        elif (bounds[0] == 'pmc'):
+            e[0] = e[0] - 2 * dt/ dx/ EPS0*(h[0])
         else:
             raise ValueError(f"Unknown boundary condition: {self.bounds[0]}")
 
@@ -66,6 +68,8 @@ class FDTD1D:
         elif self.bounds[1] == 'mur':
             self.e[-1] = self.e_old_right + (C0*dt - self.dx) / \
                 (C0*dt + self.dx)*(self.e[-2] - self.e[-1])
+        elif (bounds[1] == 'pmc'):
+            e[-1] = e[-1] + 2 * dt/dx / EPS0*(h[-1])
         else:
             raise ValueError(f"Unknown boundary condition: {self.bounds[1]}")
 
