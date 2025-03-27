@@ -102,6 +102,25 @@ def test_fdtd_1d_solver_permittivity():
 
     assert np.corrcoef(final_condition, expected_condition)[0,1] >= 0.99
 
+def test_fdtd_1d_solver_conductivity():
+    nx = 101
+    xE = np.linspace(-5, 5, nx)
+    x0 = 0.5
+    sigma = 0.25
+
+    dx = xE[1] - xE[0]
+    dt = 0.5 * dx / C0
+    Tf = 10
+
+    initial_condition = gaussian_pulse(xE, x0, sigma)
+    solver = FDTD1D(xE, bounds=('pec', 'pec'))
+    solver.set_initial_condition(initial_condition)
+    energy_0 = np.sum(initial_condition**2)
+    final_condition = solver.run_until(Tf, dt)
+    energy_f = np.sum(final_condition**2)
+
+    assert energy_0 > energy_f
+
 
 if __name__ == "__main__":
     pytest.main([__file__]) 
