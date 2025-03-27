@@ -60,6 +60,8 @@ class FDTD1D:
                 (C0*dt + self.dx)*(self.e[1] - self.e[0])
         elif self.bounds[0] == 'pmc':
             self.e[0] = self.e[0] - 2 * dt/ self.dx/ EPS0*(self.h[0])
+        elif self.bounds[0] == 'periodic':
+            self.e[0] = self.e[-2]
         else:
             raise ValueError(f"Unknown boundary condition: {self.bounds[0]}")
 
@@ -70,6 +72,8 @@ class FDTD1D:
                 (C0*dt + self.dx)*(self.e[-2] - self.e[-1])
         elif self.bounds[1] == 'pmc':
             self.e[-1] = self.e[-1] + 2 * dt/self.dx / EPS0*(self.h[-1])
+        elif self.bounds[1] == 'periodic':
+            self.e[-1] = self.e[1]
         else:
             raise ValueError(f"Unknown boundary condition: {self.bounds[1]}")
 
@@ -83,3 +87,4 @@ class FDTD1D:
             self.step(dt)
 
         return self.e 
+
