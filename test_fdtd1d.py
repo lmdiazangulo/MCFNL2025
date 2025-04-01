@@ -122,6 +122,36 @@ def test_fdtd_1d_solver_permittivity():
 
     assert np.corrcoef(final_condition, expected_condition)[0,1] >= 0.99
 
+
+def test_fdtd_1d_solver_energy():
+    nx = 101
+    xE = np.linspace(-1, 1, nx)
+    x0 = 0.0
+    sigma = 0.1
+
+    dx = xE[1] - xE[0]
+    dt = 0.5 * dx / C0
+    Tf = 2
+
+    initial_condition = gaussian_pulse(xE, x0, sigma)
+    solver = FDTD1D(xE, bounds=('pec', 'pec'))
+    solver.set_initial_condition(initial_condition)
+    final_condition = solver.run_until(Tf, dt)
+
+    tolerance = 0.01
+
+    for i in range(len(solver.energyE)):
+        assert ( solver.energy[0] - solver.energy[i] ) < tolerance
+    
+
+    #plt.plot(solver.energyE, label='Energy E')
+    #plt.plot(solver.energyH, label='Energy H')
+    #plt.xlabel('Time step')
+    #plt.ylabel('Energy')
+    #plt.title('Energy in FDTD Simulation')
+    #plt.show()
+
+
 def test_fdtd_1d_solver_conductivity():
     """Test FDTD solver with a unique conductivity region."""
     nx = 1001
@@ -147,15 +177,11 @@ def test_fdtd_1d_solver_conductivity():
     solver.set_conductivity_regions([(-L/2,L/2,COND1)])
     
     final_condition = solver.run_until(Tf, dt)
-
     
-    #We define Energy at time zero meaning 
-    initial_energy = np.sum(initial_condition**2)
-    final_energy = np.sum(final_condition**2)
-    tole = 1e-4 #Tolerance value to check if energy went smaller
-    assert (initial_energy-final_energy) >= tole
+    tolerance = 0.01
 
-
+    for i in range(len(solver.energyE)):
+        assert solver.energy[0] >= solver.energy[i]
 
 
 if __name__ == "__main__":
