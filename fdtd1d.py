@@ -23,8 +23,12 @@ class FDTD1D:
         self.bounds = bounds
         self.e = np.zeros_like(self.xE)
         self.h = np.zeros_like(self.xH)
+        self.h_old = np.zeros_like(self.h)
         self.eps = np.ones_like(self.xE)  # Default permittivity is 1 everywhere
         self.initialized = False
+        self.energyE = []
+        self.energyH = []
+        self.energy = []
 
     def set_initial_condition(self, initial_condition):
         self.e[:] = initial_condition[:]
@@ -72,6 +76,12 @@ class FDTD1D:
             self.e[-1] = self.e[-1] + 2 * dt/self.dx / EPS0*(self.h[-1])
         else:
             raise ValueError(f"Unknown boundary condition: {self.bounds[1]}")
+        
+        # Energy calculation
+        self.energyE.append(0.5 * np.dot(self.e, self.dx * self.eps * self.e))
+        self.energyH.append(0.5 * np.dot(self.h_old, self.dx * MU0 * self.h))
+        self.energy.append(0.5 * np.dot(self.e, self.dx * self.eps * self.e) + 0.5 * np.dot(self.h_old, self.dx * MU0 * self.h))
+        self.h_old[:] = self.h[:]
 
     def run_until(self, Tf, dt):
         if not self.initialized:
