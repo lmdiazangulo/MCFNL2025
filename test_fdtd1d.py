@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, gaussian_pulse, C0, EPS0, EPS1, R, T, C1
+from fdtd1d import FDTD1D, gaussian_pulse, C0, EPS0, EPS1, R, T, C1, COND1
 
 
 def test_fdtd_1d_solver_basic_propagation():
@@ -123,23 +123,39 @@ def test_fdtd_1d_solver_permittivity():
     assert np.corrcoef(final_condition, expected_condition)[0,1] >= 0.99
 
 def test_fdtd_1d_solver_conductivity():
-    nx = 101
-    xE = np.linspace(-5, 5, nx)
-    x0 = 0.5
+    """Test FDTD solver with a unique conductivity region."""
+    nx = 1001
+    L = 10
+    d = 2
+    xE = np.linspace(-L/2, L/2, nx)
+    x0 = 0
     sigma = 0.25
-
+    
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 10
+    Tf = 4
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
-    solver = FDTD1D(xE, bounds=('pec', 'pec'))
+    solver = FDTD1D(xE)
     solver.set_initial_condition(initial_condition)
-    energy_0 = np.sum(initial_condition**2)
+    
+    # Set different permittivity regions
+    solver.set_permittivity_regions([
+        (-L/2, L/2-d, EPS0),  # First region with EPS0
+        (L/2-d, L/2, EPS1)    # Second region with EPS1
+    ])
+    solver.set_conductivity_regions([(-L/2,L/2,COND1)])
+    
     final_condition = solver.run_until(Tf, dt)
-    energy_f = np.sum(final_condition**2)
 
-    assert energy_0 > energy_f
+    
+    #We define Energy at time zero meaning 
+    initial_energy = np.sum(initial_condition**2)
+    final_energy = np.sum(final_condition**2)
+    tole = 1e-4 #Tolerance value to check if energy went smaller
+    assert (initial_energy-final_energy) >= tole
+
+
 
 
 if __name__ == "__main__":
