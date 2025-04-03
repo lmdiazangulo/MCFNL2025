@@ -65,6 +65,26 @@ def test_fdtd_pmc_conditions():
 
     assert np.corrcoef(solved_e, expected_condition)[0,1] >= 0.99
 
+def test_fdtd_periodic_conditions():
+    nx = 101
+    xE = np.linspace(-5, 5, nx)
+    x0 = 2.0
+    sigma = 0.5
+    
+    dx = xE[1] - xE[0]
+    dt = 0.5 * dx / C0
+    Tf =((np.max(xE) - np.min(xE))/2-x0)/C0
+    
+
+    initial_e = gaussian_pulse(xE, x0, sigma)
+    solver = FDTD1D(xE, bounds=('periodic', 'periodic'))
+    solver.set_initial_condition(initial_e)
+    solved_e = solver.run_until(Tf, dt)
+
+    assert (solved_e[-1]) != 0.0 and (solved_e[-1]) <0.75, "Test failed"
+
+
+
 
 def test_fdtd_mur_conditions():
     """Test that Mur boundary conditions properly absorb the field."""
