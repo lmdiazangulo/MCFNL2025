@@ -18,7 +18,7 @@ def gaussian_pulse(x, x0, sigma):
 class FDTD1D:
     def __init__(self, xE, bounds=('pec', 'pec')):
         self.xE = np.array(xE)
-        self.xH = (self.xE[:1] + self.xE[1:]) / 2.0
+        self.xH = (self.xE[:-1] + self.xE[1:]) / 2.0
         self.dx = self.xE[1] - self.xE[0]
         self.bounds = bounds
         self.e = np.zeros_like(self.xE)
@@ -99,6 +99,14 @@ class FDTD1D:
         self.energyH.append(0.5 * np.dot(self.h_old, self.dx * MU0 * self.h))
         self.energy.append(0.5 * np.dot(self.e, self.dx * self.eps * self.e) + 0.5 * np.dot(self.h_old, self.dx * MU0 * self.h))
         self.h_old[:] = self.h[:]
+
+        # For debugging and visualization
+        # plt.plot(self.xE, self.e, label='Electric Field')
+        # plt.plot(self.xH, self.h, label='Magnetic Field')
+        # plt.ylim(-1,1)
+        # plt.pause(0.01)
+        # plt.grid()
+        # plt.cla()
 
     def run_until(self, Tf, dt):
         if not self.initialized:
