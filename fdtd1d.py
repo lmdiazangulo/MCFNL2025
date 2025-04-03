@@ -7,8 +7,6 @@ C0 = 1 / np.sqrt(MU0*EPS0)
 
 # Constants for permittivity regions test
 EPS1 = 2.0
-# Constant for conductivity regions test
-COND1 = 0.5
 C1 = 1 / np.sqrt(MU0*EPS1)
 R = (np.sqrt(EPS0)-np.sqrt(EPS1))/(np.sqrt(EPS0)+np.sqrt(EPS1))
 T = 2*np.sqrt(EPS0)/(np.sqrt(EPS0)+np.sqrt(EPS1))

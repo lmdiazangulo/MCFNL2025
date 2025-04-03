@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, gaussian_pulse, C0, EPS0, EPS1, R, T, C1, COND1
+from fdtd1d import FDTD1D, gaussian_pulse, C0, EPS0, EPS1, R, T, C1
 
 
 def test_fdtd_1d_solver_basic_propagation():
@@ -188,6 +188,7 @@ def test_fdtd_1d_solver_conductivity():
     xE = np.linspace(-L/2, L/2, nx)
     x0 = 0
     sigma = 0.25
+    cond1 = 0.5
     
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
@@ -202,11 +203,9 @@ def test_fdtd_1d_solver_conductivity():
         (-L/2, L/2-d, EPS0),  # First region with EPS0
         (L/2-d, L/2, EPS1)    # Second region with EPS1
     ])
-    solver.set_conductivity_regions([(-L/2,L/2,COND1)])
+    solver.set_conductivity_regions([(-L/2, L/2, cond1)])
     
-    final_condition = solver.run_until(Tf, dt)
-    
-    tolerance = 0.01
+    solver.run_until(Tf, dt)
 
     for i in range(len(solver.energyE)):
         assert solver.energy[0] >= solver.energy[i]
