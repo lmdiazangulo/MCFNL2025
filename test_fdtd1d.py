@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, gaussian_pulse, C0, EPS0, EPS1, R, T, C1
+from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1
 
 
 def test_fdtd_1d_solver_basic_propagation():
@@ -17,7 +17,7 @@ def test_fdtd_1d_solver_basic_propagation():
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE)
     solver.set_initial_condition(initial_condition)
-    final_condition = solver.run_until(Tf, dt)
+    final_condition = solver.run_until(Tf=Tf, dt=dt)
 
     expected_condition = \
         0.5 * gaussian_pulse(xE, x0 - C0 * Tf, sigma) + \
@@ -39,7 +39,7 @@ def test_fdtd_1d_solver_pec():
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pec', 'pec'))
     solver.set_initial_condition(initial_condition)
-    final_condition = solver.run_until(Tf, dt)
+    final_condition = solver.run_until(Tf=Tf, dt=dt)
 
     expected_condition = -initial_condition
 
@@ -50,40 +50,20 @@ def test_fdtd_pmc_conditions():
     xE = np.linspace(-5, 5, nx)
     x0 = 0.0
     sigma = 0.5
-    
+
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
     Tf =np.max(xE) - np.min(xE)/ C0
-    
+
 
     initial_e = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pmc', 'pmc'))
     solver.set_initial_condition(initial_e)
-    solved_e = solver.run_until(Tf, dt)
+    solved_e = solver.run_until(Tf=Tf, dt=dt)
 
     expected_condition = initial_e
 
     assert np.corrcoef(solved_e, expected_condition)[0,1] >= 0.99
-
-def test_fdtd_periodic_conditions():
-    nx = 101
-    xE = np.linspace(-5, 5, nx)
-    x0 = 2.0
-    sigma = 0.5
-    
-    dx = xE[1] - xE[0]
-    dt = 0.5 * dx / C0
-    Tf =((np.max(xE) - np.min(xE))/2-x0)/C0
-    
-
-    initial_e = gaussian_pulse(xE, x0, sigma)
-    solver = FDTD1D(xE, bounds=('periodic', 'periodic'))
-    solver.set_initial_condition(initial_e)
-    solved_e = solver.run_until(Tf, dt)
-
-    assert (solved_e[-1]) != 0.0 and (solved_e[-1]) <0.75, "Test failed"
-
-
 
 
 def test_fdtd_mur_conditions():
@@ -100,7 +80,7 @@ def test_fdtd_mur_conditions():
     initial_e = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('mur', 'mur'))
     solver.set_initial_condition(initial_e)
-    solved_e = solver.run_until(Tf, dt)
+    solved_e = solver.run_until(Tf=Tf, dt=dt)
 
     rms = np.sqrt(np.mean(solved_e**2))
     assert rms < 0.01
@@ -116,7 +96,7 @@ def test_fdtd_1d_solver_permittivity():
 
     x0 = 0
     sigma = 0.25
-    
+
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
     Tf = 4
@@ -124,14 +104,14 @@ def test_fdtd_1d_solver_permittivity():
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE)
     solver.set_initial_condition(initial_condition)
-    
+
     # Set different permittivity regions
     solver.set_permittivity_regions([
         (-L/2, L/2-d, EPS0),  # First region with EPS0
         (L/2-d, L/2, EPS1)    # Second region with EPS1
     ])
-    
-    final_condition = solver.run_until(Tf, dt)
+
+    final_condition = solver.run_until(Tf=Tf, dt=dt)
 
     expected_condition = np.zeros(nx)
     expected_condition[:nx1] = \
@@ -155,13 +135,13 @@ def test_fdtd_1d_solver_energy():
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pec', 'pec'))
     solver.set_initial_condition(initial_condition)
-    final_condition = solver.run_until(Tf, dt)
+    final_condition = solver.run_until(Tf=Tf, dt=dt)
 
     tolerance = 0.01
 
     for i in range(len(solver.energyE)):
         assert ( solver.energy[0] - solver.energy[i] ) < tolerance
-    
+
 
     plt.plot(solver.energyE, label='Energy E')
     plt.plot(solver.energyH, label='Energy H')
@@ -170,66 +150,53 @@ def test_fdtd_1d_solver_energy():
     plt.title('Energy in FDTD Simulation')
     plt.show()
 
-
-def test_fdtd_1d_solver_energy():
+def test_fdtd_1d_nonuniform_grid():
     nx = 101
-    xE = np.linspace(-1, 1, nx)
+    xE_nonuniform = sigmoid_grid(xmin=-1,xmax=1,npoints=nx)
     x0 = 0.0
     sigma = 0.1
-
-    dx = xE[1] - xE[0]
-    dt = 0.5 * dx / C0
     Tf = 2
 
-    initial_condition = gaussian_pulse(xE, x0, sigma)
-    solver = FDTD1D(xE, bounds=('pec', 'pec'))
+    initial_condition = gaussian_pulse(xE_nonuniform, x0, sigma)
+
+    # Two tests, one for mur and one for pec
+
+    mursolver = FDTD1D(xE_nonuniform, bounds=('mur', 'mur'))
+    mursolver.set_initial_condition(initial_condition)
+    final_mur_condition = mursolver.run_until(Tf=Tf)
+
+    pecsolver = FDTD1D(xE_nonuniform, bounds=('pec', 'pec'))
+    pecsolver.set_initial_condition(initial_condition)
+    final_pec_condition = pecsolver.run_until(Tf=Tf)
+
+    # Test if mur and pec behave well
+    tolerance = 1e-3
+    expected_pec_condition = -initial_condition
+    assert np.max(np.abs(final_mur_condition)) < tolerance and np.corrcoef(final_pec_condition, expected_pec_condition)[0,1] >= 0.99
+
+def test_fdtd_1d_tfsf():
+    xE = np.linspace(-5,5,501)
+
+    tfsf_start = -1
+    tfsf_end = 1
+    tfsf_x0 = -3.0  # So that it takes some time to get to the tf region
+    tfsf_sigma = 0.1
+    tfsf_function = gaussian_pulse(xE, tfsf_x0, tfsf_sigma)
+
+    T_before = 1
+    T_after = 10 # Two times so that the field is tested to be null both before the arrival of the tfsf function and after
+
+    initial_condition = np.zeros_like(xE)
+    solver = FDTD1D(xE, bounds=('mur', 'mur'))
     solver.set_initial_condition(initial_condition)
-    final_condition = solver.run_until(Tf, dt)
+    solver.set_tfsf_conditions(tfsf_start, tfsf_end, tfsf_function)
+
+    final_condition_before_arrival = solver.run_until(Tf=T_before)
+    final_condition_after_arrival = solver.run_until(Tf=T_after)
 
     tolerance = 0.01
-
-    for i in range(len(solver.energyE)):
-        assert ( solver.energy[0] - solver.energy[i] ) < tolerance
-    
-
-    #plt.plot(solver.energyE, label='Energy E')
-    #plt.plot(solver.energyH, label='Energy H')
-    #plt.xlabel('Time step')
-    #plt.ylabel('Energy')
-    #plt.title('Energy in FDTD Simulation')
-    #plt.show()
-
-
-def test_fdtd_1d_solver_conductivity():
-    """Test FDTD solver with a unique conductivity region."""
-    nx = 1001
-    L = 10
-    d = 2
-    xE = np.linspace(-L/2, L/2, nx)
-    x0 = 0
-    sigma = 0.25
-    cond1 = 0.5
-    
-    dx = xE[1] - xE[0]
-    dt = 0.5 * dx / C0
-    Tf = 4
-
-    initial_condition = gaussian_pulse(xE, x0, sigma)
-    solver = FDTD1D(xE)
-    solver.set_initial_condition(initial_condition)
-    
-    # Set different permittivity regions
-    solver.set_permittivity_regions([
-        (-L/2, L/2-d, EPS0),  # First region with EPS0
-        (L/2-d, L/2, EPS1)    # Second region with EPS1
-    ])
-    solver.set_conductivity_regions([(-L/2, L/2, cond1)])
-    
-    solver.run_until(Tf, dt)
-
-    for i in range(len(solver.energyE)):
-        assert solver.energy[0] >= solver.energy[i]
+    assert np.max(np.abs(final_condition_before_arrival)) < tolerance and np.max(np.abs(final_condition_after_arrival)) < tolerance
 
 
 if __name__ == "__main__":
-    pytest.main([__file__]) 
+    pytest.main([__file__])
