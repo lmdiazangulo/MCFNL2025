@@ -95,7 +95,7 @@ class FDTD1D:
         self.e_old_right = self.e[-2]
         
         '''
-        Udatede FDTD Scheme to implement PML and conductivity. 
+        Updated FDTD Scheme to implement PML and conductivity. 
         The original one is returned when self.condPML and 
         self.cond are 0 arrays (default by definition).
         '''
