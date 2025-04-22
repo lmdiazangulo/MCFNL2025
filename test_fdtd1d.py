@@ -229,37 +229,67 @@ def test_fdtd_1d_solver_conductivity():
 
     for i in range(len(solver.energyE)):
         assert solver.energy[0] >= solver.energy[i]
-        
-def test_fdtd_1d_solver_PML():
-    """Test FDTD solver with a PML boundary conditions."""
-    nx = 10001
-    L = 10
+  
+def test_fdtd_1d_solver_PML_ENERGY():
+    """Test FDTD solver with a PML boundary conditions (for the energy)"""
+    nx = 101
+    L = 101
     xE = np.linspace(-L/2, L/2, nx)
     x0 = 0
-    sigma = 0.25
+    sigma = 3
     
     dx = xE[1] - xE[0]
     dt = 0.25 * dx / C0
     Tf = L
 
     #PML variables
-    R0=1e-6 #Reflection admited
-    m=4 # Steepness of the grading
-    thicknessPML=250
-
+    R0=1e-6
+    m=2 # Steepness of the grading
+    thicknessPML=10
+    sigmaMax=(-np.log(R0)*(m+1))/(2*thicknessPML*dx)
     # Set initial conditions to a gaussian pulse
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pec','pec'))
-    solver.set_initial_condition(initial_condition)
     
+    solver.set_initial_condition(initial_condition)
     # Set PML
-    solver.set_PML(thicknessPML, m, R0, dx)
+    solver.set_PML(thicknessPML, m,sigmaMax)
     
     # Run the simulation
     solver.run_until(Tf, dt)
-
     # Check that the energy after the wave have passed through the PML is almost 0 in the whole grid
     assert solver.energy[-1]/solver.energy[0] < 0.05
+    
+def test_fdtd_1d_solver_PML_R_COEFFICIENT():
+    """Test FDTD solver with a PML boundary conditions (for the R coefficient)"""
+    nx = 101
+    L = 101
+    xE = np.linspace(-L/2, L/2, nx)
+    x0 = 0
+    sigma = 3
+    
+    dx = xE[1] - xE[0]
+    dt = 0.25 * dx / C0
+    Tf = L
 
+    #PML variables
+    R0=1e-6
+    m=2 # Steepness of the grading
+    thicknessPML=10
+    sigmaMax=(-np.log(R0)*(m+1))/(2*thicknessPML*dx)
+    # Set initial conditions to a gaussian pulse
+    initial_condition = gaussian_pulse(xE, x0, sigma)
+    solver = FDTD1D(xE, bounds=('pec','pec'))
+    
+    solver.set_initial_condition(initial_condition)
+    Ei=np.max(solver.e)
+    # Set PML
+    solver.set_PML(thicknessPML, m,sigmaMax)
+    
+    # Run the simulation
+    solver.run_until(Tf, dt)
+    Er=np.max(solver.e)
+    # Check that the energy after the wave have passed through the PML is almost 0 in the whole grid
+    assert np.abs(Er/Ei)<0.05
 if __name__ == "__main__":
     pytest.main([__file__]) 

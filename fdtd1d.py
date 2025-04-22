@@ -61,7 +61,7 @@ class FDTD1D:
             
             self.cond[start_idx:end_idx] = cond_value 
             
-    def set_PML(self,thicknessPML,m,R0,dx):
+    def set_PML(self,thicknessPML,m,sigmaMax):
         
         '''
         Setting the PML region and value
@@ -71,7 +71,6 @@ class FDTD1D:
         of thicknessPML cells.
         '''
         
-        sigmaMax=(-np.log(R0)*(m+1))/(2*thicknessPML*dx)
         for i in range(0,thicknessPML):
             sigmai=sigmaMax*((thicknessPML-i)/thicknessPML)**m
             right_index= int(len(self.condPML)-1-i)
