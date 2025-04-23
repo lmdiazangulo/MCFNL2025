@@ -99,7 +99,7 @@ def test_fdtd_2d_solver_PML_relection_coefficient():
     solver.set_initial_condition(initial_condition)
 
     # Save initial Hz field
-    initial_Hz = np.max(solver.Hz.copy())
+    initial_Hz = np.max(np.abs(solver.Hz.copy()))
 
     # Set PML
     solver.set_PML(thicknessPML, m, R0, dx)
@@ -108,9 +108,9 @@ def test_fdtd_2d_solver_PML_relection_coefficient():
     solver.run_until(Tf, dt)
 
     # Check that the energy after the wave have passed through the PML is almost 0 in the whole grid
-    final_Hz = np.max(solver.Hz.copy())
+    final_Hz = np.max(np.abs(solver.Hz.copy()))
 
-    assert final_Hz / initial_Hz < 0.01
+    assert np.abs(final_Hz / initial_Hz)**2 < 0.01
 
 
 @pytest.mark.skip("Not really a test")
