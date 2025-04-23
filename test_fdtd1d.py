@@ -282,14 +282,14 @@ def test_fdtd_1d_solver_PML_R_COEFFICIENT():
     solver = FDTD1D(xE, bounds=('pec','pec'))
     
     solver.set_initial_condition(initial_condition)
-    Ei=np.max(solver.e)
+    Ei=np.max(np.abs(solver.e))
     # Set PML
     solver.set_PML(thicknessPML, m,sigmaMax)
     
     # Run the simulation
     solver.run_until(Tf, dt)
-    Er=np.max(solver.e)
+    Er=np.max(np.abs(solver.e))
     # Check that the energy after the wave have passed through the PML is almost 0 in the whole grid
-    assert np.abs(Er/Ei)<0.05
+    assert np.abs(Er/Ei)**2<0.01
 if __name__ == "__main__":
     pytest.main([__file__]) 

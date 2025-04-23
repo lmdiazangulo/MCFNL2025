@@ -40,21 +40,21 @@ class FDTD2D:
 
     def set_PML(self, thicknessPML, m, R0, dx):
         sigmaMax = (-np.log(R0) * (m + 1)) / (2 * thicknessPML * dx)
-
+        
         for i in range(1, thicknessPML):
             sigmai = sigmaMax * ((thicknessPML - i) / thicknessPML) ** m
-
+            right_index= int(len(self.condPMLx)-1-i)
             # Apply PML to the X-axis boundaries
-            self.condPMLx[i, :] = sigmai
-            self.condPMLx[-i, :] = sigmai
-            self.condx[i, :] = sigmai
-            self.condx[-i, :] = sigmai
+            self.condPMLx[i, :] += sigmai
+            self.condPMLx[right_index, :] += sigmai
+            self.condx[i, :] += sigmai
+            self.condx[right_index, :] += sigmai
 
             # Apply PML to the Y-axis boundaries
-            self.condPMLy[:, i] = sigmai
-            self.condPMLy[:, -i] = sigmai
-            self.condy[:, i] = sigmai
-            self.condy[:, -i] = sigmai
+            self.condPMLy[:, i] += sigmai
+            self.condPMLy[:, right_index] += sigmai
+            self.condy[:, i] += sigmai
+            self.condy[:, right_index] += sigmai
 
     def step(self, dt):
         if not self.initialized:
