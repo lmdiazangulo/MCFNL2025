@@ -313,7 +313,34 @@ def test_fdtd_1d_total_scattered_field():
     # plt.show()
     assert np.allclose(final_condition, expected_condition,atol = 1e-2), "Total field not properly injected"
 
+def test_fdtd_1d_solver_probe():
+    '''Test FDTD solver with a probe in void and mur conditions'''
+    x = np.linspace(0, 300, 500)
+    sim = FDTD1D(x, bounds=('mur', 'mur'))
+    DT = 1 * sim.dx / C0
+    TF = (200)/C0
+    t = np.linspace(0,TF,round(TF/DT)-1)
+    x_probe = t*C0
 
+    def initial_condition(x,x0):
+        return 0.5*np.exp(-(x-x0)**2 / (20)**2 )
+    
+    sim.set_initial_condition(initial_condition(x,50))
+    sim.add_probe([150])
+    sim.run_until(Tf = TF,dt = DT)
+
+    measured_e = sim.e_measure[0]
+    expected_e = 0.5*initial_condition(x_probe,100) # Expected shape. It takes into account that that the initial gaussian is splitted in two
+    
+    '''
+    plt.clf()
+    plt.plot(t,measured_e, label = f"Probe")
+    plt.plot(x_probe,expected_e,label = "Initial Condition")
+    plt.legend()
+    plt.show()
+    '''
+
+    assert np.corrcoef(measured_e, expected_e)[0,1] >= 0.99, "Field not correctly measured"
 
 if __name__ == "__main__":
     pytest.main([__file__]) 

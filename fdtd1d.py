@@ -33,6 +33,9 @@ class FDTD1D:
         self.energy = []
         self.time = 0
         self.total_field = []
+        self.indexProbe = []
+        self.e_measure = []
+        self.h_measure = []
 
     def set_initial_condition(self, initial_condition):
         self.e[:] = initial_condition[:]
@@ -94,7 +97,20 @@ class FDTD1D:
 
         '''
         isource = np.where(self.xE > xs)[0][0] # Index in xE and xH of the location of the source
-        self.total_field = self.total_field + [isource, sourceFunction]     
+        self.total_field = self.total_field + [isource, sourceFunction]
+    
+    def add_probe(self,x_probe):
+        '''
+        Add probes that measure and record the magnetic and electric field at their location
+        at each time step during the simulation.
+        Args:
+            x_probe: list of positions in space where the probes will be located
+        '''
+        for location in x_probe:
+            index = np.where(self.xE > location)[0][0]
+            self.indexProbe += [index]
+            self.e_measure += [[]]
+            self.h_measure += [[]]
         
             
     def step(self, dt):
@@ -117,11 +133,17 @@ class FDTD1D:
             sourcefunction = self.total_field[1]
             self.h[isource] += sourcefunction(self.xH[isource],self.time)/2
             self.h[isource-1] += sourcefunction(self.xH[isource-1],self.time)/2
+        if self.indexProbe: # Measure of magnetic field
+            for i in range(len(self.indexProbe)):
+                self.h_measure[i] += [self.h[self.indexProbe[i]]]
         self.time += dt/2 # Half time step upload
 
         self.e[1:-1] = ( 1 / ((self.eps[1:-1] / dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dx * (self.h[1:] - self.h[:-1]) )
         if self.total_field: # Injection of total field in e field
             self.e[isource] += sourcefunction(self.xE[isource],self.time)
+        if self.indexProbe: # Measure of electric field
+            for i in range(len(self.indexProbe)):
+                self.e_measure[i] += [self.e[self.indexProbe[i]]]
         self.time += dt/2# Half time step upload
 
         if self.bounds[0] == 'pec':
@@ -154,9 +176,9 @@ class FDTD1D:
         self.energy.append(0.5 * np.dot(self.e, self.dx * self.eps * self.e) + 0.5 * np.dot(self.h_old, self.dx * MU0 * self.h))
         self.h_old[:] = self.h[:]
         
-        
-        # For debugging and visualization
         '''
+        # For debugging and visualization
+        
         if not hasattr(self, 'step_counter'):
             self.step_counter = 0  # Initialize step counter if it doesn't exist
 
@@ -169,6 +191,9 @@ class FDTD1D:
             plt.title(f"Step {self.step_counter}")
             plt.plot(self.xE, self.e, label='Electric Field')
             plt.plot(self.xH, self.h, label='Magnetic Field')
+            if self.indexProbe:
+                for i in self.indexProbe:
+                    plt.plot(self.xE[i],0,"rs",label = "probe")
             plt.ylim(-1, 1)
             plt.pause(0.01)
             plt.grid()
