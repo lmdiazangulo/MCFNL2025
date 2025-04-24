@@ -31,6 +31,8 @@ class FDTD1D:
         self.energyE = []
         self.energyH = []
         self.energy = []
+        self.time = 0
+        self.total_field = []
 
     def set_initial_condition(self, initial_condition):
         self.e[:] = initial_condition[:]
@@ -82,7 +84,17 @@ class FDTD1D:
         #plt.plot(self.xH,self.condPML) #to plot the PML profile
         #plt.show()
             
-            
+    def add_totalfield(self,xs,sourceFunction):
+        '''
+        Add a field source at a given location, both in the electric and magnetic domain.
+        Args:
+            xs: Location in space of the source
+
+            sourceFunction: Function F(x,t) that gives the shape of the field injected in xs
+
+        '''
+        isource = np.where(self.xE > xs)[0][0] # Index in xE and xH of the location of the source
+        self.total_field = self.total_field + [isource, sourceFunction]     
         
             
     def step(self, dt):
@@ -100,7 +112,17 @@ class FDTD1D:
         '''
         self.h[:] = ( 1 / ((MU0 / dt) + (self.condPML[:] / 2)) ) * ( ( (MU0/dt) - (self.condPML[:]/2) ) * self.h[:] - 1 / self.dx * (self.e[1:] - self.e[:-1]) )
         #self.h[:] = self.h[:] - dt / self.dx / MU0 * (self.e[1:] - self.e[:-1])
+        if self.total_field: # Injection of total field in h field
+            isource = self.total_field[0]
+            sourcefunction = self.total_field[1]
+            self.h[isource] += sourcefunction(self.xH[isource],self.time)/2
+            self.h[isource-1] += sourcefunction(self.xH[isource-1],self.time)/2
+        self.time += dt/2 # Half time step upload
+
         self.e[1:-1] = ( 1 / ((self.eps[1:-1] / dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dx * (self.h[1:] - self.h[:-1]) )
+        if self.total_field: # Injection of total field in e field
+            self.e[isource] += sourcefunction(self.xE[isource],self.time)
+        self.time += dt/2# Half time step upload
 
         if self.bounds[0] == 'pec':
             self.e[0] = 0.0
@@ -132,8 +154,9 @@ class FDTD1D:
         self.energy.append(0.5 * np.dot(self.e, self.dx * self.eps * self.e) + 0.5 * np.dot(self.h_old, self.dx * MU0 * self.h))
         self.h_old[:] = self.h[:]
         
-        '''
+        
         # For debugging and visualization
+        '''
         if not hasattr(self, 'step_counter'):
             self.step_counter = 0  # Initialize step counter if it doesn't exist
 
@@ -142,7 +165,8 @@ class FDTD1D:
         plt.axvspan(self.xE[-200], self.xE[-1], color='skyblue', alpha=0.05, label='zona destacada')
 
         # Plot only every 10 steps (you can adjust the interval as needed)
-        if self.step_counter % 10 == 0:
+        if self.step_counter % 20 == 0:
+            plt.title(f"Step {self.step_counter}")
             plt.plot(self.xE, self.e, label='Electric Field')
             plt.plot(self.xH, self.h, label='Magnetic Field')
             plt.ylim(-1, 1)
@@ -150,6 +174,7 @@ class FDTD1D:
             plt.grid()
             plt.cla()
         '''
+        
     def run_until(self, Tf, dt):
         if not self.initialized:
             raise RuntimeError(
