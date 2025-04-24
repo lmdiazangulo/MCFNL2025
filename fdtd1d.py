@@ -103,6 +103,18 @@ class FDTD1D:
         #plt.plot(self.xH,self.condPML) #to plot the PML profile
         #plt.show()
 
+    def add_totalfield(self,xs,sourceFunction):
+        '''
+        Add a field source at a given location, both in the electric and magnetic domain.
+        Args:
+            xs: Location in space of the source
+
+            sourceFunction: Function F(x,t) that gives the shape of the field injected in xs
+
+        '''
+        isource = np.where(self.xE > xs)[0][0] # Index in xE and xH of the location of the source
+        self.total_field = self.total_field + [isource, sourceFunction]
+
     def set_tfsf_conditions(self, x_start, x_end, function):
         self.x_start = x_start
         self.x_end = x_end

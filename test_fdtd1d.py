@@ -259,6 +259,28 @@ def test_fdtd_1d_solver_PML_R_COEFFICIENT():
     # Check that the energy after the wave have passed through the PML is almost 0 in the whole grid
     assert np.abs(Er/Ei)**2<0.01
 
+def test_fdtd_1d_total_scattered_field():
+    x = np.linspace(0, 300, 500)
+    sim = FDTD1D(x, bounds=('pec', 'mur'))
+    DT = 0.5 * sim.dx / C0
+
+    def source_test(x,t):
+        return 0.5*np.exp(-(x-C0*t)**2 / (20)**2 )
+
+    sim.add_totalfield(
+    100,
+    source_test)
+    sim.set_initial_condition(np.zeros_like(x))
+
+    final_condition = sim.run_until(Tf=1200*DT, dt=DT)
+    expected_condition = np.zeros_like(final_condition)
+
+    # plt.plot(sim.xE,final_condition)
+    # plt.plot(sim.xE,expected_condition)
+    # plt.show()
+    assert np.allclose(final_condition, expected_condition,atol = 1e-2), "Total field not properly injected"
+
+
 def test_fdtd_1d_nonuniform_grid():
     nx = 101
     xE_nonuniform = sigmoid_grid(xmin=-1,xmax=1,npoints=nx)
