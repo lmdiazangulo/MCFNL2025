@@ -176,7 +176,7 @@ class FDTD1D:
         self.energy.append(0.5 * np.dot(self.e, self.dx * self.eps * self.e) + 0.5 * np.dot(self.h_old, self.dx * MU0 * self.h))
         self.h_old[:] = self.h[:]
         
-        
+        '''
         # For debugging and visualization
         
         if not hasattr(self, 'step_counter'):
@@ -198,7 +198,7 @@ class FDTD1D:
             plt.pause(0.01)
             plt.grid()
             plt.cla()
-        
+        '''
         
     def run_until(self, Tf, dt):
         if not self.initialized:
