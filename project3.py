@@ -9,7 +9,7 @@ COND0 = 0.0
 # Constants for permittivity regions test
 EPS1 = 1.0
 C1 = 1 / np.sqrt(MU0*EPS1)
-COND1 = 1.0
+COND1 = 3.0
 R = (np.sqrt(EPS0)-np.sqrt(EPS1))/(np.sqrt(EPS0)+np.sqrt(EPS1))
 T = 2*np.sqrt(EPS0)/(np.sqrt(EPS0)+np.sqrt(EPS1))
 
@@ -31,8 +31,8 @@ class FDTD1D:
         #We define the regions for the permittivity and conductivity. We define the x position of the start of the region and its width.
 
         self.regions = {
-            'eps': [(0.7, 0.71, EPS1)],
-            'cond': [(0.7, 0.71, COND1)]
+            'eps': [(0.7, 0.72, EPS1)],
+            'cond': [(0.7, 0.72, COND1)]
         }
         # Set the permittivity and conductivity regions
         self.set_permittivity_regions(self.regions['eps'])
@@ -77,7 +77,7 @@ class FDTD1D:
         #self.h[:] = self.h[:] - dt / self.dx / MU0 * (self.e[1:] - self.e[:-1]) + self.cond[1:] * dt / 2 * (self.e[1:] + self.e[:-1])
 
         self.h[:] = self.h[:] - dt / self.dx / MU0 * (self.e[1:] - self.e[:-1])
-        self.e[1:-1] = (self.eps[1:-1] - self.cond[1:-1] * dt/2) / (self.eps[1:-1] + self.cond[1:-1] * dt/2) * self.e[1:-1] - dt / self.dx / self.eps[1:-1] * (self.h[1:] - self.h[:-1])
+        self.e[1:-1] = (self.eps[1:-1] - self.cond[1:-1] * dt/2) / (self.eps[1:-1] + self.cond[1:-1] * dt/2) * self.e[1:-1] - dt / self.dx / (self.eps[1:-1]+self.cond[1:-1]*dt/2) * (self.h[1:] - self.h[:-1])
 
         if self.bounds[0] == 'pec':
             self.e[0] = 0.0
