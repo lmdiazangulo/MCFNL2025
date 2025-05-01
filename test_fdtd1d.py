@@ -356,6 +356,52 @@ def test_fdtd_1d_tfsf():
     tolerance = 0.01
     assert np.max(np.abs(final_condition_before_arrival)) < tolerance and np.max(np.abs(final_condition_after_arrival)) < tolerance
 
+def test_RTcoeffs_conductive_panel_1d():
+    """Test FDTD solver with conductive panel of width d."""
+    nx = 1001
+    L = 10
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+    xE = np.linspace(-L/2, L/2, nx)
+
+    xPanel = 2
+    wPanel = 0.5
+    
+    # Constants for permittivity regions test
+    x0 = 0
+    sigma = 0.25
+
+    dx = xE[1] - xE[0]
+    dt = 0.5 * dx / C0
+    Tf = 4
+    
+    EPS0 = 1.0
+    COND0 = 0.0
+    EPS1 = 1.0
+    COND1 = 48.0
+
+    initial_condition = gaussian_pulse(xE, x0, sigma)
+    solver = FDTD1D(xE)
+    solver.set_initial_condition(initial_condition)
+
+    # Set different permittivity regions
+    solver.set_permittivity_regions([
+        (-L/2, wPanel/2+xPanel, EPS0),  # First region with EPS0
+        (-wPanel/2+xPanel, wPanel/2+xPanel, EPS1),    # Second region with EPS1
+        (wPanel/2+xPanel, L/2, EPS0) 
+    ])
+
+    solver.set_conductivity_regions([
+        (-L/2, wPanel/2+xPanel, EPS0),  # First region with EPS0
+        (-wPanel/2+xPanel, wPanel/2+xPanel, EPS1),   # Second region with EPS1
+        (wPanel/2+xPanel, L/2, EPS0) 
+    ])
+
+    final_condition = solver.run_until(Tf=Tf, dt=dt)
+
+    
+
+test_RTcoeffs_conductive_panel_1d()
+
+
+'''if __name__ == "__main__":
+    pytest.main([__file__])'''

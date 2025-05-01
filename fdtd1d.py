@@ -120,7 +120,7 @@ class FDTD1D:
         isource = np.where(self.xE > xs)[0][0] # Index in xE and xH of the location of the source
         self.total_field = self.total_field + [isource, sourceFunction]
 
-    def add_probe(self,x_probe):
+    def add_probe(self,x_probe, regions):
         '''
         Add probes that measure and record the magnetic and electric field at their location
         at each time step during the simulation.
@@ -140,7 +140,7 @@ class FDTD1D:
         self.tfsolver.set_initial_condition(function)
         self.tfsf = True
 
-    def step(self):
+    def step(self, regions=None):
         if not self.initialized:
             raise RuntimeError(
                 "Initial condition not set. Call set_initial_condition first.")
@@ -214,16 +214,26 @@ class FDTD1D:
         # plt.axvspan(self.xE[-(len(self.xE)-1)], self.xE[-1], color='skyblue', alpha=0.05, label='zona destacada')
 
         # Plot only every 100 steps (you can adjust the interval as needed)
-        if self.step_counter % 1000 == 0:
-            plt.plot(self.xE, self.e,'.-', label='Electric Field')
-            plt.plot(self.xH, self.h,'.-', label='Magnetic Field')
+        # Plot only every 10 steps (you can adjust the interval as needed)
+        
+        # Plot every 10 steps
+        if self.step_counter % 10 == 0:
+            plt.plot(self.xE, self.e, '.-', label='Electric Field')
+            plt.plot(self.xH, self.h, '.-', label='Magnetic Field')
+            ax = plt.gca()
+            if regions is not None:
+                for idx, (start_x, end_x, _) in enumerate(regions):
+                    ax.axvline(x=start_x, color='r', linestyle='--', label='Region Boundary' if idx == 0 else "")
+                    ax.axvline(x=end_x, color='r', linestyle='--')
             plt.ylim(-1, 1)
-            plt.pause(0.01)
             plt.grid()
+            plt.pause(0.01)
             plt.cla()
 
 
+
     def run_until(self, Tf=None, dt=None, n_steps=100):
+        print("Running simulation...")
         if not self.initialized:
             raise RuntimeError(
                 "Initial condition not set. Call set_initial_condition first.")
