@@ -367,7 +367,7 @@ def test_RTcoeffs_conductive_panel_1d():
     wPanel = 0.5
     
     # Constants for permittivity regions test
-    x0 = 0
+    x0 = 0.5
     sigma = 0.25
 
     dx = xE[1] - xE[0]
@@ -376,18 +376,19 @@ def test_RTcoeffs_conductive_panel_1d():
     
     
     EPS1 = 1.0
-    COND1 = 48.0
+    COND1 = 0.5
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
-    solver = FDTD1D(xE)
+    solver = FDTD1D(xE,bounds=('mur', 'mur'))
     solver.set_initial_condition(initial_condition)
 
     # Set different permittivity regions
-    solver.set_layer_panel(L,wPanel,xPanel,EPS1,COND1)
+    solver.set_layer_panel(L, wPanel, xPanel, 1.0, 0.0, EPS1, COND1)
 
     final_condition = solver.run_until(Tf=Tf, dt=dt)
 
     
+#test_fdtd_1d_nonuniform_grid()
 
 test_RTcoeffs_conductive_panel_1d()
 

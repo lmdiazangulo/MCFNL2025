@@ -73,9 +73,9 @@ class FDTD1D:
             end_idx = np.searchsorted(self.xE, end_x)
             self.eps[start_idx:end_idx] = eps_value
 
-        max_eps = np.max(self.eps)
+        '''max_eps = np.max(self.eps)
         c_max = 1 / np.sqrt(MU0*max_eps)
-        self.dt = 0.9 * np.min(np.concatenate([self.dxE, self.dxH])) / c_max  # Redefine the safe dt according to permittivities
+        self.dt = 0.9 * np.min(np.concatenate([self.dxE, self.dxH])) / c_max  # Redefine the safe dt according to permittivities'''
 
     def set_conductivity_regions(self, regions):
         """Set different conductivity regions in the grid.
@@ -91,20 +91,20 @@ class FDTD1D:
             self.cond[start_idx:end_idx] = cond_value
 
 
-    def set_layer_panel(self, L, wPanel, xPanel, eps_value=1, cond_value=0):
+    def set_layer_panel(self, L, wPanel, xPanel, eps_value=1, cond_value=0, eps_layer = 1, cond_layer = 0):
         '''
         Set a layer panel in the grid with given permittivity and conductivity values.
         '''
         self.set_permittivity_regions([
-        (-L/2, wPanel/2+xPanel, self.eps),  # First region with EPS0
-        (-wPanel/2+xPanel, wPanel/2+xPanel, eps_value),    # Second region with EPS1
-        (wPanel/2+xPanel, L/2, self.eps) 
+            (-L/2, -wPanel/2+xPanel, eps_value),  # First region with EPS0
+            (-wPanel/2+xPanel, wPanel/2+xPanel, eps_layer),    # Second region with EPS1
+            (wPanel/2+xPanel, L/2, eps_value) 
         ])
 
         self.set_conductivity_regions([
-            (-L/2, wPanel/2+xPanel, self.cond),  # First region with EPS0
-            (-wPanel/2+xPanel, wPanel/2+xPanel, cond_value),   # Second region with EPS1
-            (wPanel/2+xPanel, L/2, self.cond) 
+            (-L/2, -wPanel/2+xPanel, cond_value),  # First region with EPS0
+            (-wPanel/2+xPanel, wPanel/2+xPanel, cond_layer),   # Second region with EPS1
+            (wPanel/2+xPanel, L/2, cond_value) 
         ])
         self.wPanel = wPanel
         self.xPanel = xPanel
@@ -172,7 +172,13 @@ class FDTD1D:
 
         # Field calculation
 
-        self.h[:] = ( 1 / ((MU0 / self.dt) + (self.condPML[:] / 2)) ) * ( ( (MU0/self.dt) - (self.condPML[:]/2) ) * self.h[:] - 1 / self.dxE[:] * (self.e[1:] - self.e[:-1]) )
+        C1h = (MU0 / self.dt + self.condPML[:] / 2)
+        C2h = (MU0 / self.dt - self.condPML[:] / 2)
+
+        self.h[:] = (C2h / C1h * self.h[:])  - MU0 * self.dt / self.dxE[:] * (self.e[1:] - self.e[:-1])
+
+        # self.h[:] = ( 1 / ((MU0 / self.dt) + (self.condPML[:] / 2)) ) * ( ( (MU0/self.dt) - (self.condPML[:]/2) ) * self.h[:] - self.dt * MU0 / self.dxE[:] * (self.e[1:] - self.e[:-1]) )
+        
         #self.h[:] = self.h[:] - dt / self.dx / MU0 * (self.e[1:] - self.e[:-1])
         if self.total_field: # Injection of total field in h field
             isource = self.total_field[0]
@@ -184,7 +190,14 @@ class FDTD1D:
                 self.h_measure[i] += [self.h[self.indexProbe[i]]]
         self.time += self.dt/2 # Half time step upload
 
-        self.e[1:-1] = ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/self.dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dxH[:] * (self.h[1:] - self.h[:-1]) )
+        C1e = (self.eps[1:-1] + self.cond[1:-1] * self.dt / 2)
+        C2e = (self.eps[1:-1] - self.cond[1:-1] * self.dt / 2)
+
+        self.e[1:-1] = (C2e / C1e * self.e[1:-1]) - self.dt / (self.dxH  * C1e) * (self.h[1:] - self.h[:-1])
+
+
+        # self.e[1:-1] = ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/self.dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dxH[:] * ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * (self.h[1:] - self.h[:-1]) )
+
         if self.total_field: # Injection of total field in e field
             self.e[isource] += sourcefunction(self.xE[isource],self.time)
         if self.indexProbe: # Measure of electric field
@@ -240,13 +253,14 @@ class FDTD1D:
         
         # Plot every 10 steps
         if self.step_counter % 10 == 0:
-            plt.plot(self.xE, self.e, '.-', label='Electric Field')
-            plt.plot(self.xH, self.h, '.-', label='Magnetic Field')
+            plt.plot(self.xE, self.e, '-', label='Electric Field')
+            plt.plot(self.xH, self.h, '-', label='Magnetic Field')
             ax = plt.gca()
             if(self.wPanel>0):
-                plt.vlines(x=self.xPanel-self.wPanel/2, color='r', linestyle='--', label='Region Boundary')
-                plt.vlines(x=self.xPanel+self.wPanel/2, color='r', linestyle='--')
+                ax.axvline(x=self.xPanel-self.wPanel/2, color='r', linestyle='--', label='Region Boundary')
+                ax.axvline(x=self.xPanel+self.wPanel/2, color='r', linestyle='--')
             plt.ylim(-1, 1)
+            plt.legend()
             plt.grid()
             plt.pause(0.01)
             plt.cla()
