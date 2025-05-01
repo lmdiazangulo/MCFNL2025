@@ -51,12 +51,15 @@ class FDTD1D:
         self.indexProbe = []
         self.e_measure = []
         self.h_measure = []
+        self.wPanel = 0
+        self.xPanel = 0
 
     def set_initial_condition(self, initial_condition, initial_h_condition=None):
         self.e[:] = initial_condition[:]
         if initial_h_condition is not None:
             self.h[:] = initial_h_condition[:]
         self.initialized = True
+
 
     def set_permittivity_regions(self, regions):
         """Set different permittivity regions in the grid.
@@ -86,6 +89,25 @@ class FDTD1D:
             end_idx = np.searchsorted(self.xE, end_x)
 
             self.cond[start_idx:end_idx] = cond_value
+
+
+    def set_layer_panel(self, L, wPanel, xPanel, eps_value=1, cond_value=0):
+        '''
+        Set a layer panel in the grid with given permittivity and conductivity values.
+        '''
+        self.set_permittivity_regions([
+        (-L/2, wPanel/2+xPanel, self.eps),  # First region with EPS0
+        (-wPanel/2+xPanel, wPanel/2+xPanel, eps_value),    # Second region with EPS1
+        (wPanel/2+xPanel, L/2, self.eps) 
+        ])
+
+        self.set_conductivity_regions([
+            (-L/2, wPanel/2+xPanel, self.cond),  # First region with EPS0
+            (-wPanel/2+xPanel, wPanel/2+xPanel, cond_value),   # Second region with EPS1
+            (wPanel/2+xPanel, L/2, self.cond) 
+        ])
+        self.wPanel = wPanel
+        self.xPanel = xPanel
 
     def set_PML(self,thicknessPML,m,sigmaMax):
 
@@ -221,10 +243,9 @@ class FDTD1D:
             plt.plot(self.xE, self.e, '.-', label='Electric Field')
             plt.plot(self.xH, self.h, '.-', label='Magnetic Field')
             ax = plt.gca()
-            if regions is not None:
-                for idx, (start_x, end_x, _) in enumerate(regions):
-                    ax.axvline(x=start_x, color='r', linestyle='--', label='Region Boundary' if idx == 0 else "")
-                    ax.axvline(x=end_x, color='r', linestyle='--')
+            if(self.wPanel>0):
+                plt.vlines(x=self.xPanel-self.wPanel/2, color='r', linestyle='--', label='Region Boundary')
+                plt.vlines(x=self.xPanel+self.wPanel/2, color='r', linestyle='--')
             plt.ylim(-1, 1)
             plt.grid()
             plt.pause(0.01)

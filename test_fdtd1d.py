@@ -374,8 +374,7 @@ def test_RTcoeffs_conductive_panel_1d():
     dt = 0.5 * dx / C0
     Tf = 4
     
-    EPS0 = 1.0
-    COND0 = 0.0
+    
     EPS1 = 1.0
     COND1 = 48.0
 
@@ -384,17 +383,7 @@ def test_RTcoeffs_conductive_panel_1d():
     solver.set_initial_condition(initial_condition)
 
     # Set different permittivity regions
-    solver.set_permittivity_regions([
-        (-L/2, wPanel/2+xPanel, EPS0),  # First region with EPS0
-        (-wPanel/2+xPanel, wPanel/2+xPanel, EPS1),    # Second region with EPS1
-        (wPanel/2+xPanel, L/2, EPS0) 
-    ])
-
-    solver.set_conductivity_regions([
-        (-L/2, wPanel/2+xPanel, EPS0),  # First region with EPS0
-        (-wPanel/2+xPanel, wPanel/2+xPanel, EPS1),   # Second region with EPS1
-        (wPanel/2+xPanel, L/2, EPS0) 
-    ])
+    solver.set_layer_panel(L,wPanel,xPanel,EPS1,COND1)
 
     final_condition = solver.run_until(Tf=Tf, dt=dt)
 
