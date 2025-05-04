@@ -24,6 +24,76 @@ def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpo
   grid = xmin + (grid - np.min(grid)) / (np.max(grid) - np.min(grid)) * (xmax - xmin) #Rescale it so that it matches the endpoints
   return grid
 
+def RT_coeffs_scikit(initial_condition, dt, eps0, cond0, eps1, cond1, wPanel):
+    import numpy as np
+    from scipy.fft import fft, fftfreq, fftshift, ifft, ifftshift
+    from scipy.interpolate import interp1d
+    import skrf as rf
+
+    # === Espectro de frecuencias normalizadas ===
+    frequencies = fftfreq(len(initial_condition), dt)  # en unidades naturalizadas
+    freq = fftshift(frequencies)
+    omega = 2 * np.pi * freq
+
+    # FFT de la señal incidente
+    G_incident = fftshift(fft(initial_condition))
+
+    # === Eliminar la frecuencia cero para evitar división por cero en scikit-rf ===
+    mid_idx = len(freq) // 2
+    freq_no0 = np.delete(freq, mid_idx)
+    omega_no0 = 2 * np.pi * freq_no0
+    omega_safe = np.where(omega_no0 == 0, 1e-12, omega_no0)  # por seguridad extra
+
+    # === Propiedades del material (sin unidades físicas) ===
+    er = eps1 / eps0
+    sigma = cond1
+    thickness = wPanel
+    mu = 1.0  # unidades normalizadas
+
+    # === Cálculo de parámetros complejos ===
+    epsilon_complex = er - 1j * sigma / omega_safe
+    gamma = 1j * omega_no0 * np.sqrt(mu * epsilon_complex)
+    Z0 = np.sqrt(mu / epsilon_complex)
+
+    # === Crear frecuencia para skrf (GHz ficticios) ===
+    freq_GHz = freq_no0 * 1e-3
+    frequency = rf.Frequency.from_f(freq_GHz, unit='ghz')
+
+    # === Medio y línea de transmisión ===
+    medium = rf.media.DefinedGammaZ0(frequency=frequency, gamma=gamma, Z0=Z0)
+    layer = medium.line(d=thickness, unit='m')
+
+    # === Parámetros S ===
+    s11 = layer.s[:, 0, 0]
+    s21 = layer.s[:, 1, 0]
+
+    # === Interpolación a las frecuencias completas (incluyendo ω = 0) ===
+    interp_s11 = interp1d(freq_no0 * 1e3, s11, kind='cubic', fill_value='extrapolate', bounds_error=False)
+
+    interp_s21 = interp1d(freq_no0 * 1e3, s21, kind='cubic', fill_value='extrapolate', bounds_error=False)
+
+    S11 = interp_s11(freq * 1e3)
+    S21 = interp_s21(freq * 1e3)
+
+    print("Max |S11|:", np.max(np.abs(S11)))
+    print("Mean |S11|:", np.mean(np.abs(S11)))
+
+
+    # === Campos reflejado y transmitido ===
+    G_reflected = G_incident * S11
+    G_transmitted = G_incident * S21
+
+    E_reflected = np.real(ifft(ifftshift(G_reflected)))
+    E_transmitted = np.real(ifft(ifftshift(G_transmitted)))
+
+    # === Coeficientes R y T por energía ===
+    R = np.sum(E_reflected**2) / np.sum(initial_condition**2)
+    T = np.sum(E_transmitted**2) / np.sum(initial_condition**2)
+
+    return R, T
+
+
+
 
 
 class FDTD1D:
@@ -162,6 +232,12 @@ class FDTD1D:
         self.tfsolver.set_initial_condition(function)
         self.tfsf = True
 
+    
+
+
+
+
+        
     def step(self, regions=None):
         if not self.initialized:
             raise RuntimeError(
@@ -264,6 +340,7 @@ class FDTD1D:
             plt.grid()
             plt.pause(0.01)
             plt.cla()
+
 
 
 

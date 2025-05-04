@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1
+from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1, RT_coeffs_scikit
 
 
 def test_fdtd_1d_solver_basic_propagation():
@@ -12,7 +12,7 @@ def test_fdtd_1d_solver_basic_propagation():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 2
+    Tf = 1
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE)
@@ -364,28 +364,50 @@ def test_RTcoeffs_conductive_panel_1d():
     xE = np.linspace(-L/2, L/2, nx)
 
     xPanel = 2
-    wPanel = 0.5
+    wPanel = 0.2
     
     # Constants for permittivity regions test
-    x0 = 0.5
+    x0 = 0
     sigma = 0.25
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
     Tf = 4
     
-    
-    EPS1 = 1.0
-    COND1 = 0.5
+    EPS1 = 5
+    COND1 = 1.0
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
-    solver = FDTD1D(xE,bounds=('mur', 'mur'))
+    solver = FDTD1D(xE, bounds=('mur', 'mur'))
     solver.set_initial_condition(initial_condition)
 
-    # Set different permittivity regions
+    # Set different permittivity and conductivity regions
     solver.set_layer_panel(L, wPanel, xPanel, 1.0, 0.0, EPS1, COND1)
 
     final_condition = solver.run_until(Tf=Tf, dt=dt)
+
+    # Analytical RT coefficients
+    R, T = RT_coeffs_scikit(initial_condition / 2, dt, 1.0, 0.0, EPS1, COND1, wPanel)
+
+    idx_transmitted = xE > (xPanel + wPanel / 2 + dx)
+    x_transmitted = xE[idx_transmitted]
+    wave_transmitted = final_condition[idx_transmitted]
+    x_T = x_transmitted[np.argmax(np.abs(wave_transmitted))]
+
+    x_R = 2 * (xPanel - wPanel / 2) - C0 * Tf
+
+    
+
+    R_exp = abs( final_condition[np.searchsorted(xE, x_R)] / (np.max(initial_condition)*0.5))
+    T_exp = abs( final_condition[np.searchsorted(xE, x_T)] / (np.max(initial_condition)*0.5))
+
+
+    print(f"x_R (estimado): {x_R}")
+    print(f"x_T (máximo encontrado): {x_T}")
+    print(f"R (estimado): {R_exp}")
+    print(f"T (estimado): {T_exp}")
+    print(f"R: {R}, T: {T}")
+
 
     
 #test_fdtd_1d_nonuniform_grid()
