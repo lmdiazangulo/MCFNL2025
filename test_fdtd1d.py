@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1, RT_coeffs_scikit
+from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1, RT_coeffs
 
 
 def test_fdtd_1d_solver_basic_propagation():
@@ -374,8 +374,8 @@ def test_RTcoeffs_conductive_panel_1d():
     dt = 0.5 * dx / C0
     Tf = 4
     
-    EPS1 = 5
-    COND1 = 1.0
+    EPS1 = 1.0
+    COND1 = 2.0
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('mur', 'mur'))
@@ -387,7 +387,7 @@ def test_RTcoeffs_conductive_panel_1d():
     final_condition = solver.run_until(Tf=Tf, dt=dt)
 
     # Analytical RT coefficients
-    R, T = RT_coeffs_scikit(initial_condition / 2, dt, 1.0, 0.0, EPS1, COND1, wPanel)
+    R, T = RT_coeffs(initial_condition, dt, EPS1, COND1, wPanel, sigma) 
 
     idx_transmitted = xE > (xPanel + wPanel / 2 + dx)
     x_transmitted = xE[idx_transmitted]
@@ -396,21 +396,16 @@ def test_RTcoeffs_conductive_panel_1d():
 
     x_R = 2 * (xPanel - wPanel / 2) - C0 * Tf
 
-    
-
     R_exp = abs( final_condition[np.searchsorted(xE, x_R)] / (np.max(initial_condition)*0.5))
     T_exp = abs( final_condition[np.searchsorted(xE, x_T)] / (np.max(initial_condition)*0.5))
 
-
-    print(f"x_R (estimado): {x_R}")
-    print(f"x_T (máximo encontrado): {x_T}")
     print(f"R (estimado): {R_exp}")
     print(f"T (estimado): {T_exp}")
     print(f"R: {R}, T: {T}")
 
+    assert np.abs(R_exp - R) < 0.05, "R coefficient not matching"
+    assert np.abs(T_exp - T) < 0.05, "T coefficient not matching"
 
-    
-#test_fdtd_1d_nonuniform_grid()
 
 test_RTcoeffs_conductive_panel_1d()
 

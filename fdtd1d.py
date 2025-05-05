@@ -14,6 +14,14 @@ T = 2*np.sqrt(EPS0)/(np.sqrt(EPS0)+np.sqrt(EPS1))
 def gaussian_pulse(x, x0, sigma):
     return np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
 
+
+def gaussian_pulse_frequency(omega, t0, sigma):
+        """
+        Espectro de un pulso gaussiano desplazado en el tiempo:
+        G(ω) = sqrt(2π)·σ·exp(−(σ²·ω²)/2)·exp(−j ω t0)
+        """
+        return 0.5*np.sqrt(2*np.pi)*sigma * np.exp(- (sigma**2 * omega**2)/2) * np.exp(-1j*omega*t0)
+
 def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpoint=0 for centered sigmoid in interval
   """
   Generates a non-uniform grid using a sigmoid function.
@@ -24,71 +32,46 @@ def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpo
   grid = xmin + (grid - np.min(grid)) / (np.max(grid) - np.min(grid)) * (xmax - xmin) #Rescale it so that it matches the endpoints
   return grid
 
-def RT_coeffs_scikit(initial_condition, dt, eps0, cond0, eps1, cond1, wPanel):
+def RT_coeffs(initial_condition, dt, eps1, cond1, thickness, sigma):
     import numpy as np
-    from scipy.fft import fft, fftfreq, fftshift, ifft, ifftshift
-    from scipy.interpolate import interp1d
+    import matplotlib.pyplot as plt
     import skrf as rf
 
-    # === Espectro de frecuencias normalizadas ===
-    frequencies = fftfreq(len(initial_condition), dt)  # en unidades naturalizadas
-    freq = fftshift(frequencies)
-    omega = 2 * np.pi * freq
+    N = len(initial_condition)  
 
-    # FFT de la señal incidente
-    G_incident = fftshift(fft(initial_condition))
+    f_full     = np.fft.fftfreq(N, d=dt)      # incluye f<0
+    omega_full = 2*np.pi * f_full
+    P_full     = gaussian_pulse_frequency(omega_full, t0=0.0, sigma=sigma)
 
-    # === Eliminar la frecuencia cero para evitar división por cero en scikit-rf ===
-    mid_idx = len(freq) // 2
-    freq_no0 = np.delete(freq, mid_idx)
-    omega_no0 = 2 * np.pi * freq_no0
-    omega_safe = np.where(omega_no0 == 0, 1e-12, omega_no0)  # por seguridad extra
+    mask_pos = f_full > 0
+    omega_pos= omega_full[mask_pos]
+    P_pos    = P_full[mask_pos]
 
-    # === Propiedades del material (sin unidades físicas) ===
-    er = eps1 / eps0
-    sigma = cond1
-    thickness = wPanel
-    mu = 1.0  # unidades normalizadas
+    epsilon_complex = eps1 - 1j * cond1 / omega_pos
+    gamma           = 1j * omega_pos * np.sqrt(epsilon_complex)
+    Z0              = np.sqrt(1.0 / epsilon_complex)
 
-    # === Cálculo de parámetros complejos ===
-    epsilon_complex = er - 1j * sigma / omega_safe
-    gamma = 1j * omega_no0 * np.sqrt(mu * epsilon_complex)
-    Z0 = np.sqrt(mu / epsilon_complex)
+    phi_11 = np.cosh(gamma * thickness)
+    phi_12 = Z0 * np.sinh(gamma * thickness)
+    phi_21 = 1 / Z0 * np.sinh(gamma * thickness)
+    phi_22 = np.cosh(gamma * thickness)
 
-    # === Crear frecuencia para skrf (GHz ficticios) ===
-    freq_GHz = freq_no0 * 1e-3
-    frequency = rf.Frequency.from_f(freq_GHz, unit='ghz')
+    T = (2) / (phi_11 + phi_12 + phi_21 + phi_22)
+    R = (phi_11 + phi_12 - phi_21 - phi_22) / (phi_11 + phi_12 + phi_21 + phi_22)
 
-    # === Medio y línea de transmisión ===
-    medium = rf.media.DefinedGammaZ0(frequency=frequency, gamma=gamma, Z0=Z0)
-    layer = medium.line(d=thickness, unit='m')
+    S11_pos = R
+    S21_pos = T
 
-    # === Parámetros S ===
-    s11 = layer.s[:, 0, 0]
-    s21 = layer.s[:, 1, 0]
+    pulse_inc = np.fft.irfft(P_pos, n=N) / dt
+    pulse_ref = np.fft.irfft(S11_pos * P_pos, n=N) / dt
+    pulse_trn = np.fft.irfft(S21_pos * P_pos, n=N) / dt
 
-    # === Interpolación a las frecuencias completas (incluyendo ω = 0) ===
-    interp_s11 = interp1d(freq_no0 * 1e3, s11, kind='cubic', fill_value='extrapolate', bounds_error=False)
+    pulse_inc = np.fft.fftshift(pulse_inc)
+    pulse_ref = np.fft.fftshift(pulse_ref)
+    pulse_trn = np.fft.fftshift(pulse_trn)
 
-    interp_s21 = interp1d(freq_no0 * 1e3, s21, kind='cubic', fill_value='extrapolate', bounds_error=False)
-
-    S11 = interp_s11(freq * 1e3)
-    S21 = interp_s21(freq * 1e3)
-
-    print("Max |S11|:", np.max(np.abs(S11)))
-    print("Mean |S11|:", np.mean(np.abs(S11)))
-
-
-    # === Campos reflejado y transmitido ===
-    G_reflected = G_incident * S11
-    G_transmitted = G_incident * S21
-
-    E_reflected = np.real(ifft(ifftshift(G_reflected)))
-    E_transmitted = np.real(ifft(ifftshift(G_transmitted)))
-
-    # === Coeficientes R y T por energía ===
-    R = np.sum(E_reflected**2) / np.sum(initial_condition**2)
-    T = np.sum(E_transmitted**2) / np.sum(initial_condition**2)
+    R=np.max(np.abs(pulse_ref))/np.max(pulse_inc)
+    T=np.max(pulse_trn)/np.max(pulse_inc)
 
     return R, T
 
