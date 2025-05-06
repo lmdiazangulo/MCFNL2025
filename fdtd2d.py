@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib.patches import Rectangle
 
 MU0 = 1.0
 EPS0 = 1.0
 C0 = 1 / np.sqrt(MU0*EPS0)
-
 
 class FDTD2D:
     def __init__(self, xE, yE):
@@ -15,6 +15,7 @@ class FDTD2D:
         self.ny = len(yE)
         self.dx = xE[1] - xE[0]
         self.dy = yE[1] - yE[0]
+        
         self.condx = np.zeros_like(self.xE)  # Default conductivity is 0 everywheree
         self.condy = np.zeros_like(self.yE)
         self.condPMLx=np.zeros_like(self.xE) # Fake PML magnetic conductivty

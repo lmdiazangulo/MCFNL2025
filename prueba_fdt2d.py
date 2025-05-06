@@ -204,14 +204,16 @@ if __name__ == "__main__":
     fdtd.set_initial_condition(initial_condition)
 
    # Set PML parameters
-    fdtd.set_PML(thicknessPML=10, m=5, R0=0.01, dx=fdtd.dx)
+    fdtd.set_PML(thicknessPML=100, m=10, R0=0.001, dx=fdtd.dx)
 
     # 5) Definir panel quiral 
     λ0 = 0.5
+    kappa_medio = 1.0
+    fdtd.kappaEy = np.ones((fdtd.nx - 1, fdtd.ny    ))*kappa_medio
     fdtd.set_chiral_panel(
         x0=5, y0=3,
         wx=17 * λ0, wy=0.3 * λ0,
-        eps=1.0, sigma=0.0, kappa=6.0
+        eps=1.0, sigma=0.0, kappa=1.0
     )
 
     # Run the simulation and visualize
