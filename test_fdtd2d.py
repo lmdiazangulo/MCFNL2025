@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd2d import FDTD2D
-from fdtd1d import gaussian_pulse, C0
+from fdtd2d import FDTD2D, C0
+from fdtd1d import gaussian_pulse
 
 
 def test_fdtd_2d_solver_band_x():
