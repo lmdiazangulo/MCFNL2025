@@ -357,38 +357,43 @@ def test_fdtd_1d_tfsf():
     assert np.max(np.abs(final_condition_before_arrival)) < tolerance and np.max(np.abs(final_condition_after_arrival)) < tolerance
 
 def test_RTcoeffs_conductive_panel_1d():
-    """Test FDTD solver with conductive panel of width d."""
+    """
+    Test the reflection and transmission coefficients for a conductive panel in 1D.
+    """
+
+    # Size of the system
     nx = 1001
     L = 10
-
     xE = np.linspace(-L/2, L/2, nx)
-
-    xPanel = 2
-    wPanel = 0.2
-    
-    # Constants for permittivity regions test
-    x0 = 0
-    sigma = 0.25
-
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
     Tf = 4
-    
+
+    # Parameters of the Gaussian pulse
+    x0 = 0
+    sigma = 0.25
+
+    # Position and properties of the panel
+    xPanel = 2
+    wPanel = 0.2
     EPS1 = 1.0
     COND1 = 2.0
-
+   
+    # Set the initial condition to a Gaussian pulse and the boundaries
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('mur', 'mur'))
     solver.set_initial_condition(initial_condition)
 
-    # Set different permittivity and conductivity regions
+    # Set the panel
     solver.set_layer_panel(L, wPanel, xPanel, 1.0, 0.0, EPS1, COND1)
 
+    # Run the simulation
     final_condition = solver.run_until(Tf=Tf, dt=dt)
 
     # Analytical RT coefficients
     R, T = RT_coeffs(initial_condition, dt, EPS1, COND1, wPanel, sigma) 
 
+    # Numerical RT coefficients
     idx_transmitted = xE > (xPanel + wPanel / 2 + dx)
     x_transmitted = xE[idx_transmitted]
     wave_transmitted = final_condition[idx_transmitted]
@@ -399,16 +404,12 @@ def test_RTcoeffs_conductive_panel_1d():
     R_exp = abs( final_condition[np.searchsorted(xE, x_R)] / (np.max(initial_condition)*0.5))
     T_exp = abs( final_condition[np.searchsorted(xE, x_T)] / (np.max(initial_condition)*0.5))
 
-    print(f"R (estimado): {R_exp}")
-    print(f"T (estimado): {T_exp}")
-    print(f"R: {R}, T: {T}")
+    print(f"R (numerical): {R_exp}")
+    print(f"T (numerical): {T_exp}")
+    print(f"R (analytical): {R}, T(analytical): {T}")
 
     assert np.abs(R_exp - R) < 0.05, "R coefficient not matching"
     assert np.abs(T_exp - T) < 0.05, "T coefficient not matching"
-
-
-test_RTcoeffs_conductive_panel_1d()
  
-
-'''if __name__ == "__main__":
-    pytest.main([__file__])'''
+if __name__ == "__main__":
+    pytest.main([__file__])

@@ -33,35 +33,34 @@ def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpo
   return grid
 
 def RT_coeffs(initial_condition, dt, eps1, cond1, thickness, sigma):
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import skrf as rf
-
+    '''
+    Calculate the reflection and transmission coefficients for a Gaussian pulse incident on a slab of material with given permittivity and conductivity.
+    '''
+    # Fourier transform of the initial condition
     N = len(initial_condition)  
-
     f_full     = np.fft.fftfreq(N, d=dt)      # incluye f<0
     omega_full = 2*np.pi * f_full
     P_full     = gaussian_pulse_frequency(omega_full, t0=0.0, sigma=sigma)
-
     mask_pos = f_full > 0
     omega_pos= omega_full[mask_pos]
     P_pos    = P_full[mask_pos]
 
+    # Properties of the slab
     epsilon_complex = eps1 - 1j * cond1 / omega_pos
     gamma           = 1j * omega_pos * np.sqrt(epsilon_complex)
     Z0              = np.sqrt(1.0 / epsilon_complex)
 
+    # Calculate the transfer matrix elements
     phi_11 = np.cosh(gamma * thickness)
     phi_12 = Z0 * np.sinh(gamma * thickness)
     phi_21 = 1 / Z0 * np.sinh(gamma * thickness)
     phi_22 = np.cosh(gamma * thickness)
 
-    T = (2) / (phi_11 + phi_12 + phi_21 + phi_22)
-    R = (phi_11 + phi_12 - phi_21 - phi_22) / (phi_11 + phi_12 + phi_21 + phi_22)
+    # Calculate the reflection and transmission coefficients
+    S11_pos = (2) / (phi_11 + phi_12 + phi_21 + phi_22)
+    S21_pos = (phi_11 + phi_12 - phi_21 - phi_22) / (phi_11 + phi_12 + phi_21 + phi_22)
 
-    S11_pos = R
-    S21_pos = T
-
+    # Calculate the inverse Fourier transform of the reflected and transmitted pulses
     pulse_inc = np.fft.irfft(P_pos, n=N) / dt
     pulse_ref = np.fft.irfft(S11_pos * P_pos, n=N) / dt
     pulse_trn = np.fft.irfft(S21_pos * P_pos, n=N) / dt
@@ -70,13 +69,11 @@ def RT_coeffs(initial_condition, dt, eps1, cond1, thickness, sigma):
     pulse_ref = np.fft.fftshift(pulse_ref)
     pulse_trn = np.fft.fftshift(pulse_trn)
 
-    R=np.max(np.abs(pulse_ref))/np.max(pulse_inc)
-    T=np.max(pulse_trn)/np.max(pulse_inc)
+    # Calculate R and T coefficients
+    R = np.max(np.abs(pulse_ref))/np.max(pulse_inc)
+    T = np.max(pulse_trn)/np.max(pulse_inc)
 
     return R, T
-
-
-
 
 
 class FDTD1D:
@@ -149,14 +146,14 @@ class FDTD1D:
         Set a layer panel in the grid with given permittivity and conductivity values.
         '''
         self.set_permittivity_regions([
-            (-L/2, -wPanel/2+xPanel, eps_value),  # First region with EPS0
-            (-wPanel/2+xPanel, wPanel/2+xPanel, eps_layer),    # Second region with EPS1
+            (-L/2, -wPanel/2+xPanel, eps_value),  
+            (-wPanel/2+xPanel, wPanel/2+xPanel, eps_layer),    
             (wPanel/2+xPanel, L/2, eps_value) 
         ])
 
         self.set_conductivity_regions([
-            (-L/2, -wPanel/2+xPanel, cond_value),  # First region with EPS0
-            (-wPanel/2+xPanel, wPanel/2+xPanel, cond_layer),   # Second region with EPS1
+            (-L/2, -wPanel/2+xPanel, cond_value),  
+            (-wPanel/2+xPanel, wPanel/2+xPanel, cond_layer),   
             (wPanel/2+xPanel, L/2, cond_value) 
         ])
         self.wPanel = wPanel
@@ -215,12 +212,7 @@ class FDTD1D:
         self.tfsolver.set_initial_condition(function)
         self.tfsf = True
 
-    
-
-
-
-
-        
+          
     def step(self, regions=None):
         if not self.initialized:
             raise RuntimeError(
@@ -235,8 +227,6 @@ class FDTD1D:
         C2h = (MU0 / self.dt - self.condPML[:] / 2)
 
         self.h[:] = (C2h / C1h * self.h[:])  - MU0 * self.dt / self.dxE[:] * (self.e[1:] - self.e[:-1])
-
-        # self.h[:] = ( 1 / ((MU0 / self.dt) + (self.condPML[:] / 2)) ) * ( ( (MU0/self.dt) - (self.condPML[:]/2) ) * self.h[:] - self.dt * MU0 / self.dxE[:] * (self.e[1:] - self.e[:-1]) )
         
         #self.h[:] = self.h[:] - dt / self.dx / MU0 * (self.e[1:] - self.e[:-1])
         if self.total_field: # Injection of total field in h field
@@ -253,9 +243,6 @@ class FDTD1D:
         C2e = (self.eps[1:-1] - self.cond[1:-1] * self.dt / 2)
 
         self.e[1:-1] = (C2e / C1e * self.e[1:-1]) - self.dt / (self.dxH  * C1e) * (self.h[1:] - self.h[:-1])
-
-
-        # self.e[1:-1] = ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/self.dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dxH[:] * ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * (self.h[1:] - self.h[:-1]) )
 
         if self.total_field: # Injection of total field in e field
             self.e[isource] += sourcefunction(self.xE[isource],self.time)
@@ -323,8 +310,6 @@ class FDTD1D:
             plt.grid()
             plt.pause(0.01)
             plt.cla()
-
-
 
 
     def run_until(self, Tf=None, dt=None, n_steps=100):

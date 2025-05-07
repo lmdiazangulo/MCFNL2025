@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd2d import FDTD2D
+from fdtd2d import FDTD2D, analytic_chiral_RT, transmission_from_gaussian_pulse
 from fdtd1d import gaussian_pulse, C0
 
 
@@ -175,32 +175,95 @@ def test_fdtd_2d_solver_gaussian():
     ax3.grid(True)
     
     plt.tight_layout()
-    plt.show()
+    plt.show() 
 
+def test_fdtd_2d_solver_chiral_panel():
+    # Define the grid
+    xE = np.linspace(0, 10, 100)
+    yE = np.linspace(0, 10, 100)
 
-if __name__ == "__main__":
-    pytest.main([__file__]) 
-    # For plotting and testing
-    # Define grid
-    nx, ny = 101, 101
-    L = 101
-    xE = np.linspace(-L/2, L/2, nx)
-    yE = np.linspace(-L/2, L/2, ny)
-
-    x0, y0 = 0.0, 0.0
-    sigma = 3.0
-
-    # Create FDTD2D object
+    # Create the FDTD2D object
     fdtd = FDTD2D(xE, yE)
 
-    # Set initial condition (e.g., Gaussian pulse) with the x0 and y0 and sigma defined above
-    X, Y = np.meshgrid(xE, yE, indexing='ij')
-    initial_condition = np.exp(-((X - x0)**2 + (Y - y0)**2) / (sigma**2))
+    # Set initial condition (Gaussian pulse)
+    X, Y = np.meshgrid(xE, yE)
+    initial_condition = np.exp(-((X - 5)**2 + (Y - 5)**2) / 0.1)
+
     fdtd.set_initial_condition(initial_condition)
 
-    
-    # Set PML (optional)
-    fdtd.set_PML(thicknessPML=10, m=2.82, R0=1.5e-6, dx=fdtd.dx)
+   # Set PML parameters
+    # fdtd.set_PML(thicknessPML=100, m=10, R0=0.001, dx=fdtd.dx)
 
-    # Simulate and plot
-    fdtd.simulate_and_plot(Tf=L, dt=0.5 * np.sqrt(fdtd.dx**2 + fdtd.dy**2) / C0, interval=3)
+    # 5) Definir panel quiral 
+    λ0 = 0.5
+    kappa_medio = 0.0
+    fdtd.kappaEy = np.ones((fdtd.nx - 1, fdtd.ny    ))*kappa_medio
+
+    # Set the chiral panel parameters
+    x0 = 5
+    y0 = 3
+    wx = 17 * λ0
+    wy = 0.3 * λ0
+    eps = 1.0
+    sigma = 6.0
+    kappa = 0.0
+
+    fdtd.E_trans = 0
+
+    # Run the simulation and visualize
+    fdtd.simulate_and_plot(Tf=4, dt=0.005, pos = y0 - wy/2 - fdtd.dx, simulate = False)
+
+    E_trans_no_panel = fdtd.aux
+
+    fdtd = FDTD2D(xE, yE)
+    fdtd.set_initial_condition(initial_condition)
+
+    fdtd.set_chiral_panel(x0, y0, wx, wy, eps, sigma, kappa)
+    fdtd.simulate_and_plot(Tf=4, dt=0.005, pos = y0 - wy/2 - fdtd.dx, simulate = False)
+
+    E_trans_panel = fdtd.aux
+
+    T = abs( E_trans_panel / E_trans_no_panel)
+    print(f"Transmisión: {T:.2f}")
+
+    transmission = transmission_from_gaussian_pulse(wy, kappa, sigma, eps_r=1.0, mu_r=1.0, sigma_t=np.sqrt(0.1/2), dt=0.01, N=100)
+    print(f"Transmisión nuevo: {transmission:.2f}")
+
+    assert np.abs(T - transmission) <= 0.055, f"Expected {transmission:.4f}, got {T:.4f}"
+
+def test_chirality():
+    # Define the grid
+    xE = np.linspace(0, 10, 100)
+    yE = np.linspace(0, 10, 100)
+
+    # Create the FDTD2D object
+    fdtd = FDTD2D(xE, yE)
+
+    # Set initial condition (Gaussian pulse)
+    X, Y = np.meshgrid(xE, yE)
+    initial_condition = np.exp(-((X - 5)**2 + (Y - 5)**2) / 0.1)
+
+    fdtd.set_initial_condition(initial_condition)
+
+   # Set PML parameters
+    # fdtd.set_PML(thicknessPML=100, m=10, R0=0.001, dx=fdtd.dx)
+
+    # 5) Definir panel quiral 
+    kappa_medio = 1.0
+    fdtd.kappaEy = np.ones((fdtd.nx - 1, fdtd.ny    ))*kappa_medio
+
+    fdtd.simulate_and_plot(Tf=10, dt=0.005, pos = 0, simulate = True)
+                               
+
+
+    
+
+#test_chirality()
+
+#test_fdtd_2d_solver_chiral_panel()
+
+
+'''if __name__ == "__main__":
+    pytest.main([__file__])'''
+
+
