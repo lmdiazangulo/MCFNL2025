@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
-MU0 = 1.0
-EPS0 = 1.0
+import scipy.constants as sc
+MU0 = sc.mu_0
+EPS0 = sc.epsilon_0
 C0 = 1 / np.sqrt(MU0*EPS0)
+ETA0 = np.sqrt(MU0 / EPS0)
 
 # Constants for permittivity regions test
 EPS1 = 2.0
@@ -38,7 +39,7 @@ class FDTD1D:
         self.e = np.zeros_like(self.xE)
         self.h = np.zeros_like(self.xH)
         self.h_old = np.zeros_like(self.h)
-        self.eps = np.ones_like(self.xE)  # Default permittivity is 1 everywhere
+        self.eps = np.ones_like(self.xE)*EPS0  # Default permittivity is 1 everywhere
         self.cond = np.zeros_like(self.xE)  # Default conductivity is 0 everywheree
         self.condPML=np.zeros_like(self.xH) # Fake PML magnetic conductivty
         self.initialized = False
@@ -51,6 +52,9 @@ class FDTD1D:
         self.indexProbe = []
         self.e_measure = []
         self.h_measure = []
+        self.material_regions = [] # Region with dispersive material
+        self.J = np.zeros((6, len(self.xE)), dtype=np.complex128) # Current in dispersive material
+        self.material_coefficients = [] # Coefficientes of the dispersive material
 
     def set_initial_condition(self, initial_condition, initial_h_condition=None):
         self.e[:] = initial_condition[:]
@@ -108,6 +112,28 @@ class FDTD1D:
         #plt.plot(self.xH,self.condPML) #to plot the PML profile
         #plt.show()
 
+    def set_material_region(self, regions,dt,a_input,c_input):
+        '''
+        Set a region with dispersive material.
+        Args:
+            regions: List of tuples (start_x, end_x, Einf, cond_value) defining regions with different infinite-frequency permitivity and conductivity values
+            dt: Temporal step. Necessary for the estimation of coefficients inside the dispersive material
+        '''
+        self.material_regions = regions
+        for start_x, end_x, Einf, cond_value in regions:
+            start_idx = np.searchsorted(self.xE, start_x)
+            end_idx = np.searchsorted(self.xE, end_x)
+            self.eps[start_idx:end_idx] = Einf
+            self.cond[start_idx:end_idx] = cond_value
+        # We define the main parameters of the region
+        k_mat = (1 + a_input * dt / 2) / (1 - a_input * dt / 2)
+        beta_mat = (EPS0 * c_input * dt) / (1 - a_input * dt / 2)
+        aux = 2 * EPS0 * Einf + np.sum(2 * np.real(beta_mat))
+        den_mat = aux + cond_value * dt
+        num_mat = aux - cond_value * dt
+        coef_mat = num_mat / den_mat
+        self.material_coefficients = [k_mat,beta_mat,den_mat,coef_mat] # Coeffiecients involved in the ADE
+
     def add_totalfield(self,xs,sourceFunction):
         '''
         Add a field source at a given location, both in the electric and magnetic domain.
@@ -155,14 +181,52 @@ class FDTD1D:
         if self.total_field: # Injection of total field in h field
             isource = self.total_field[0]
             sourcefunction = self.total_field[1]
-            self.h[isource] += sourcefunction(self.xH[isource],self.time)/2
-            self.h[isource-1] += sourcefunction(self.xH[isource-1],self.time)/2
+            self.h[isource] += sourcefunction(self.xH[isource],self.time)/2.0 / ETA0
+            self.h[isource-1] += sourcefunction(self.xH[isource-1],self.time)/2.0 / ETA0
         if self.indexProbe: # Measure of magnetic field
             for i in range(len(self.indexProbe)):
                 self.h_measure[i] += [self.h[self.indexProbe[i]]]
         self.time += self.dt/2 # Half time step upload
 
-        self.e[1:-1] = ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/self.dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dxH[:] * (self.h[1:] - self.h[:-1]) )
+        if self.material_regions:
+            start_x, end_x, *_ = self.material_regions[0]
+            iE_in = np.searchsorted(self.xE, start_x)
+            iE_out = np.searchsorted(self.xE, end_x)
+
+            k_mat = self.material_coefficients[0]
+            beta_mat = self.material_coefficients[1]
+            den_mat = self.material_coefficients[2]
+            coef_mat = self.material_coefficients[3]
+
+            e_old = np.copy(self.e)
+
+            # Left side of the dispersive material
+            self.e[1:iE_in] = (1 / ((self.eps[1:iE_in] / self.dt) + (self.cond[1:iE_in] / 2))) * (
+            ((self.eps[1:iE_in] / self.dt) - (self.cond[1:iE_in] / 2)) * self.e[1:iE_in]
+            - (self.h[1:iE_in] - self.h[0:(iE_in-1)]) / self.dxH[0:(iE_in-1)]
+                 )
+
+            # Inside the dispersive material
+            Jsum = np.zeros_like(self.e)
+            for p in range(6):
+                Jsum += np.real((1 + k_mat[p]) * self.J[p, :])
+
+            self.e[iE_in:iE_out] = coef_mat * self.e[iE_in:iE_out] + (2 * self.dt / den_mat) * (
+            -(self.h[iE_in:iE_out] - self.h[iE_in-1:iE_out-1]) / self.dxE[iE_in:iE_out] - Jsum[iE_in:iE_out]
+            )
+
+            for p in range(6):
+                self.J[p, :] = k_mat[p] * self.J[p, :] + beta_mat[p] * (self.e - e_old) / self.dt
+
+            # Right side of the dispersive material
+            self.e[iE_out:-1] = (1 / ((self.eps[iE_out:-1] / self.dt) + (self.cond[iE_out:-1] / 2))) * (
+            ((self.eps[iE_out:-1] / self.dt) - (self.cond[iE_out:-1] / 2)) * self.e[iE_out:-1]
+            - (self.h[iE_out:] - self.h[iE_out-1:-1]) / self.dxE[iE_out:]
+            )
+
+        else:
+            self.e[1:-1] = ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/self.dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dxH[:] * (self.h[1:] - self.h[:-1]) )
+        
         if self.total_field: # Injection of total field in e field
             self.e[isource] += sourcefunction(self.xE[isource],self.time)
         if self.indexProbe: # Measure of electric field
@@ -214,13 +278,17 @@ class FDTD1D:
         # plt.axvspan(self.xE[-(len(self.xE)-1)], self.xE[-1], color='skyblue', alpha=0.05, label='zona destacada')
 
         # Plot only every 100 steps (you can adjust the interval as needed)
-        if self.step_counter % 1000 == 0:
-            plt.plot(self.xE, self.e,'.-', label='Electric Field')
-            plt.plot(self.xH, self.h,'.-', label='Magnetic Field')
-            plt.ylim(-1, 1)
-            plt.pause(0.01)
-            plt.grid()
-            plt.cla()
+       # if self.step_counter % 10== 0:
+          #  plt.title(self.step_counter)
+          #  plt.plot(self.xE, self.e,'.-', label='Electric Field')
+          #  plt.plot(self.xH, self.h*ETA0,'.-', label='Magnetic Field')
+          #  if self.material_regions:
+          #      for start_x, end_x, *_ in self.material_regions:
+          #          plt.axvspan(start_x, end_x, color='gray', alpha=0.3)
+          #  plt.ylim(-1, 1)
+          #  plt.pause(0.01)
+          #  plt.grid()
+          #  plt.cla() 
 
 
     def run_until(self, Tf=None, dt=None, n_steps=100):
