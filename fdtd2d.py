@@ -243,7 +243,7 @@ class FDTD2D:
         # Update time
         self.time += dt
 
-        # returneamos el maximo del campo electrico en el punto x = 5 e y = pos
+        # Returneamos el maximo del campo electrico en el punto x = 5 e y = pos
         self.E_trans = abs(self.Hz[int(5/self.dx), int(pos/self.dy)])
 
         # print(self.aux)

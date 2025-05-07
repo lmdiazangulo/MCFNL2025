@@ -196,10 +196,6 @@ def test_fdtd_2d_solver_chiral_panel():
 
     # 5) Definir panel quiral 
     λ0 = 0.5
-    kappa_medio = 0.0
-    fdtd.kappaEy = np.ones((fdtd.nx - 1, fdtd.ny    ))*kappa_medio
-
-    # Set the chiral panel parameters
     x0 = 5
     y0 = 3
     wx = 17 * λ0
@@ -251,14 +247,16 @@ def test_chirality():
     # 5) Definir panel quiral 
     kappa_medio = 1.0
     fdtd.kappaEy = np.ones((fdtd.nx - 1, fdtd.ny    ))*kappa_medio
+    fdtd.kappaEx = np.ones((fdtd.nx, fdtd.ny -1  ))*kappa_medio
 
-    fdtd.simulate_and_plot(Tf=10, dt=0.005, pos = 0, simulate = True)
+
+    fdtd.simulate_and_plot(Tf=5, dt=0.005, pos = 0, simulate = True)
                                
 
 
     
 
-#test_chirality()
+test_chirality()
 
 #test_fdtd_2d_solver_chiral_panel()
 
