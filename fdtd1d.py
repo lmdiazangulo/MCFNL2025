@@ -189,7 +189,6 @@ class FDTD1D:
         self.time += self.dt/2 # Half time step upload
 
         if self.material_regions:
-            # Región dispersiva activa
             start_x, end_x, *_ = self.material_regions[0]
             iE_in = np.searchsorted(self.xE, start_x)
             iE_out = np.searchsorted(self.xE, end_x)
@@ -201,13 +200,13 @@ class FDTD1D:
 
             e_old = np.copy(self.e)
 
-            # Lado izquierdo: material no dispersivo
+            # Left side of the dispersive material
             self.e[1:iE_in] = (1 / ((self.eps[1:iE_in] / self.dt) + (self.cond[1:iE_in] / 2))) * (
             ((self.eps[1:iE_in] / self.dt) - (self.cond[1:iE_in] / 2)) * self.e[1:iE_in]
             - (self.h[1:iE_in] - self.h[0:(iE_in-1)]) / self.dxH[0:(iE_in-1)]
                  )
 
-            # Dentro del material dispersivo
+            # Inside the dispersive material
             Jsum = np.zeros_like(self.e)
             for p in range(6):
                 Jsum += np.real((1 + k_mat[p]) * self.J[p, :])
@@ -216,12 +215,10 @@ class FDTD1D:
             -(self.h[iE_in:iE_out] - self.h[iE_in-1:iE_out-1]) / self.dxE[iE_in:iE_out] - Jsum[iE_in:iE_out]
             )
 
-
-            # Actualización de las corrientes polarizables J
             for p in range(6):
                 self.J[p, :] = k_mat[p] * self.J[p, :] + beta_mat[p] * (self.e - e_old) / self.dt
 
-            # Lado derecho: material no dispersivo
+            # Right side of the dispersive material
             self.e[iE_out:-1] = (1 / ((self.eps[iE_out:-1] / self.dt) + (self.cond[iE_out:-1] / 2))) * (
             ((self.eps[iE_out:-1] / self.dt) - (self.cond[iE_out:-1] / 2)) * self.e[iE_out:-1]
             - (self.h[iE_out:] - self.h[iE_out-1:-1]) / self.dxE[iE_out:]
