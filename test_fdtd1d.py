@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1
+from scipy import constants as const
+from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, MU0, EPS1, R, T, C1
 
 
 def test_fdtd_1d_solver_basic_propagation():
@@ -12,7 +13,7 @@ def test_fdtd_1d_solver_basic_propagation():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 2
+    Tf = 2 / C0
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE)
@@ -34,7 +35,7 @@ def test_fdtd_1d_solver_pec():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 2
+    Tf = 2/C0
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pec', 'pec'))
@@ -53,7 +54,7 @@ def test_fdtd_pmc_conditions():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf =np.max(xE) - np.min(xE)/ C0
+    Tf =(np.max(xE) - np.min(xE))/ C0
 
 
     initial_e = gaussian_pulse(xE, x0, sigma)
@@ -92,7 +93,7 @@ def test_fdtd_mur_conditions():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 10
+    Tf = 10 / C0
 
     initial_e = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('mur', 'mur'))
@@ -116,7 +117,7 @@ def test_fdtd_1d_solver_permittivity():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 4
+    Tf = 4 / C0
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE)
@@ -147,7 +148,7 @@ def test_fdtd_1d_solver_energy():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 2
+    Tf = 2 / C0
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pec', 'pec'))
@@ -179,7 +180,7 @@ def test_fdtd_1d_solver_conductivity():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 4
+    Tf = 4 / C0
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE)
@@ -200,20 +201,20 @@ def test_fdtd_1d_solver_conductivity():
 def test_fdtd_1d_solver_PML_ENERGY():
     """Test FDTD solver with a PML boundary conditions (for the energy)"""
     nx = 101
-    L = 101
+    L = 200
     xE = np.linspace(-L/2, L/2, nx)
     x0 = 0
     sigma = 3
 
     dx = xE[1] - xE[0]
     dt = 0.25 * dx / C0
-    Tf = L
+    Tf = L / C0
 
     #PML variables
     R0=1e-6
     m=2 # Steepness of the grading
-    thicknessPML=10
-    sigmaMax=(-np.log(R0)*(m+1))/(2*thicknessPML*dx)
+    thicknessPML=30
+    sigmaMax=(-np.log(R0)*(m+1))/(2*thicknessPML*dx*np.sqrt(MU0/EPS0))
     # Set initial conditions to a gaussian pulse
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pec','pec'))
@@ -230,20 +231,20 @@ def test_fdtd_1d_solver_PML_ENERGY():
 def test_fdtd_1d_solver_PML_R_COEFFICIENT():
     """Test FDTD solver with a PML boundary conditions (for the R coefficient)"""
     nx = 101
-    L = 101
+    L = 200
     xE = np.linspace(-L/2, L/2, nx)
     x0 = 0
     sigma = 3
 
     dx = xE[1] - xE[0]
     dt = 0.25 * dx / C0
-    Tf = L
+    Tf = L / C0
 
     #PML variables
     R0=1e-6
     m=2 # Steepness of the grading
-    thicknessPML=10
-    sigmaMax=(-np.log(R0)*(m+1))/(2*thicknessPML*dx)
+    thicknessPML=30
+    sigmaMax=(-np.log(R0)*(m+1))/(2*thicknessPML*dx*np.sqrt(MU0/EPS0))
     # Set initial conditions to a gaussian pulse
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE, bounds=('pec','pec'))
@@ -314,7 +315,7 @@ def test_fdtd_1d_nonuniform_grid():
     xE_nonuniform = sigmoid_grid(xmin=-1,xmax=1,npoints=nx)
     x0 = 0.0
     sigma = 0.1
-    Tf = 2
+    Tf = 2 / C0
 
     initial_condition = gaussian_pulse(xE_nonuniform, x0, sigma)
 
@@ -350,12 +351,169 @@ def test_fdtd_1d_tfsf():
     solver.set_initial_condition(initial_condition)
     solver.set_tfsf_conditions(tfsf_start, tfsf_end, tfsf_function)
 
-    final_condition_before_arrival = solver.run_until(Tf=T_before)
-    final_condition_after_arrival = solver.run_until(Tf=T_after)
+    final_condition_before_arrival = solver.run_until(Tf=T_before/C0)
+    final_condition_after_arrival = solver.run_until(Tf=T_after/C0)
 
     tolerance = 0.01
     assert np.max(np.abs(final_condition_before_arrival)) < tolerance and np.max(np.abs(final_condition_after_arrival)) < tolerance
 
+def test_fdtd_1d_DispersiveMaterial():
+    xE = np.linspace(100e-9, 300e-9, 1000)
+    DT = 0.5 * np.min(np.diff(xE)) / C0
+    TMAX = 2000 * DT
+    xs = 110e-9 # Location of source in space
+    sigma = 1e50
+    Einf  = 5.0
+
+    def source_test(x, t):
+        return 0.5 * np.exp(-(x - C0 * t)**2 / (10e-9)**2) 
+    
+    sim = FDTD1D(xE, bounds=('mur', 'mur'))
+    sim.set_initial_condition(np.zeros_like(sim.xE))
+    sim.add_totalfield(xs, source_test)
+    sim.add_probe([120e-9, 270e-9])
+    dx=np.min(np.diff(xE))
+    Conversion = const.e/const.hbar
+    # Coeffients of material
+    c_silver = np.array([
+    5.987e-1 + 4.195e3j,
+    -2.211e-1 + 2.680e-1j,
+    -4.240 + 7.324e2j,
+    6.391e-1 - 7.186e-2j,
+    1.806 + 4.563j,
+    1.443 - 8.219e1j
+    ], dtype=complex) * Conversion
+
+    a_silver = np.array([
+        -2.502e-2 - 8.626e-3j,
+        -2.021e-1 - 9.407e-1j,
+        -1.467e1 - 1.338j,
+        -2.997e-1 - 4.034j,
+        -1.896 - 4.808j,
+        -9.396 - 6.477j
+    ], dtype=complex) * Conversion
+
+
+    sim.set_material_region(
+        regions=[(150e-9, 250e-9, Einf, sigma)],
+        dt=DT,
+        a_input=a_silver,
+        c_input=c_silver
+    )
+    
+    sim.run_until(Tf=TMAX, dt=DT)
+
+    # --- Measured signals ---
+    E_1 = np.array(sim.e_measure[0])  # Measured field before the slab
+    E_2 = np.array(sim.e_measure[1])  # Measured field after the slab
+    t = np.linspace(0,TMAX,round(TMAX/DT))
+    
+    ti = 5e-16
+
+    E_i = np.copy(E_1)
+    E_i[t>ti] = 0 # Incident
+
+    E_r = np.copy(E_1)
+    E_r[t<ti] = 0 # Reflected
+
+    E_t = E_2 # Transmitted
+
+    # Fourier Transformation
+    N = 100
+
+    E_i_fft = np.abs(np.fft.fftshift(np.fft.fft(E_i,n = N*len(E_i))))
+    E_r_fft = np.abs(np.fft.fftshift(np.fft.fft(E_r,n = N*len(E_i))))
+    E_t_fft = np.abs(np.fft.fftshift(np.fft.fft(E_t,n = N*len(E_i))))
+
+    freqs = np.fft.fftshift(np.fft.fftfreq(N*len(E_i), d=DT))
+
+    # RTA Coefficients
+    R = np.abs(E_r_fft/E_i_fft)**2
+    T = np.abs(E_t_fft/E_i_fft)**2
+    A=1-R-T
+
+    assert np.max(R) > 0.9999, "R should be approximately 1"
+
+def test_fdtd_1d_DispersiveMaterial_TR():
+    xE = np.linspace(100e-9, 300e-9, 1000)
+    DT = 0.5 * np.min(np.diff(xE)) / C0
+    TMAX = 20000 * DT
+    xs = 110e-9 # Location of source in space
+    sigma = 0
+    Einf  = 5.0
+
+    def source_test(x, t):
+        return 0.5 * np.exp(-(x - C0 * t)**2 / (10e-9)**2) 
+    
+    sim = FDTD1D(xE, bounds=('mur', 'mur'))
+    sim.set_initial_condition(np.zeros_like(sim.xE))
+    sim.add_totalfield(xs, source_test)
+    sim.add_probe([120e-9, 270e-9])
+    dx=np.min(np.diff(xE))
+    Conversion = const.e/const.hbar
+    # Coeffients of material
+    c_silver = np.array([
+    5.987e-1 + 4.195e3j,
+    -2.211e-1 + 2.680e-1j,
+    -4.240 + 7.324e2j,
+    6.391e-1 - 7.186e-2j,
+    1.806 + 4.563j,
+    1.443 - 8.219e1j
+    ], dtype=complex) * Conversion
+
+    a_silver = np.array([
+        -2.502e-2 - 8.626e-3j,
+        -2.021e-1 - 9.407e-1j,
+        -1.467e1 - 1.338j,
+        -2.997e-1 - 4.034j,
+        -1.896 - 4.808j,
+        -9.396 - 6.477j
+    ], dtype=complex) * Conversion
+
+
+    sim.set_material_region(
+        regions=[(150e-9, 250e-9, Einf, sigma)],
+        dt=DT,
+        a_input=a_silver,
+        c_input=c_silver
+    )
+    
+    sim.run_until(Tf=TMAX, dt=DT)
+    # --- Measured signals ---
+    E_1 = np.array(sim.e_measure[0])  # Measured field before the slab
+    E_2 = np.array(sim.e_measure[1])  # Measured field after the slab
+    t = np.linspace(0,TMAX,round(TMAX/DT))
+    
+    ti = 5e-16
+
+    E_i = np.copy(E_1)
+    E_i[t>ti] = 0 # Incident
+
+    E_r = np.copy(E_1)
+    E_r[t<ti] = 0 # Reflected
+
+    E_t = E_2 # Transmitted
+
+    # Fourier Transformation
+    N = 100
+
+    E_i_fft = np.abs(np.fft.fftshift(np.fft.fft(E_i,n = N*len(E_i))))
+    E_r_fft = np.abs(np.fft.fftshift(np.fft.fft(E_r,n = N*len(E_i))))
+    E_t_fft = np.abs(np.fft.fftshift(np.fft.fft(E_t,n = N*len(E_i))))
+
+    freqs = np.fft.fftshift(np.fft.fftfreq(N*len(E_i), d=DT))
+
+    # RTA Coefficients
+    R = np.abs(E_r_fft/E_i_fft)**2
+    T = np.abs(E_t_fft/E_i_fft)**2
+    A=1-R-T
+
+    mask = (freqs >= 0) & (freqs <= 1.2e15)
+
+    eps = 0.1
+    assert np.all((T[mask] >= -eps) & (T[mask] <= 1 + eps)), "T should be in [0,1] within the plotted range"
+    assert np.all((R[mask] >= -eps) & (R[mask] <= 1 + eps)), "R should be in [0,1] within the plotted range"
+    assert np.all((A[mask] >= -eps) & (A[mask] <= 1 + eps)), "A should be in [0,1] within the plotted range"
 
 if __name__ == "__main__":
     pytest.main([__file__])
