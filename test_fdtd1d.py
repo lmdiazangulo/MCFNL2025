@@ -406,10 +406,13 @@ def test_RTcoeffs_conductive_panel_1d():
 
     print(f"R (numerical): {R_exp}")
     print(f"T (numerical): {T_exp}")
-    print(f"R (analytical): {R}, T(analytical): {T}")
+    print(f"R (analytical): {R})")
+    print(f"T (analytical): {T})")
 
     assert np.abs(R_exp - R) < 0.05, "R coefficient not matching"
     assert np.abs(T_exp - T) < 0.05, "T coefficient not matching"
+
+test_RTcoeffs_conductive_panel_1d()
  
-if __name__ == "__main__":
-    pytest.main([__file__])
+'''if __name__ == "__main__":
+    pytest.main([__file__])'''

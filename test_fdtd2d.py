@@ -261,10 +261,10 @@ def test_chirality():
 
 #test_chirality()
 
-#test_fdtd_2d_solver_chiral_panel()
+test_fdtd_2d_solver_chiral_panel()
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+'''if __name__ == "__main__":
+    pytest.main([__file__])'''
 
 

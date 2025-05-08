@@ -57,8 +57,8 @@ def RT_coeffs(initial_condition, dt, eps1, cond1, thickness, sigma):
     phi_22 = np.cosh(gamma * thickness)
 
     # Calculate the reflection and transmission coefficients
-    S11_pos = (2) / (phi_11 + phi_12 + phi_21 + phi_22)
-    S21_pos = (phi_11 + phi_12 - phi_21 - phi_22) / (phi_11 + phi_12 + phi_21 + phi_22)
+    S11_pos = (phi_11 + phi_12 - phi_21 - phi_22) / (phi_11 + phi_12 + phi_21 + phi_22)
+    S21_pos = (2) / (phi_11 + phi_12 + phi_21 + phi_22)
 
     # Calculate the inverse Fourier transform of the reflected and transmitted pulses
     pulse_inc = np.fft.irfft(P_pos, n=N) / dt
