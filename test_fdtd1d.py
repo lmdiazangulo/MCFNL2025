@@ -375,9 +375,9 @@ def test_RTcoeffs_conductive_panel_1d():
 
     # Position and properties of the panel
     xPanel = 2
-    wPanel = 0.2
+    wPanel = 0.1
     EPS1 = 1.0
-    COND1 = 0.5
+    COND1 = 6.0
    
     # Set the initial condition to a Gaussian pulse and the boundaries
     initial_condition = gaussian_pulse(xE, x0, sigma)
