@@ -377,7 +377,7 @@ def test_RTcoeffs_conductive_panel_1d():
     xPanel = 2
     wPanel = 0.2
     EPS1 = 1.0
-    COND1 = 2.0
+    COND1 = 0.5
    
     # Set the initial condition to a Gaussian pulse and the boundaries
     initial_condition = gaussian_pulse(xE, x0, sigma)
@@ -412,6 +412,9 @@ def test_RTcoeffs_conductive_panel_1d():
     assert np.abs(R_exp - R) < 0.05, "R coefficient not matching"
     assert np.abs(T_exp - T) < 0.05, "T coefficient not matching"
 
- 
+
+test_RTcoeffs_conductive_panel_1d()
+''' 
 if __name__ == "__main__":
     pytest.main([__file__])
+'''

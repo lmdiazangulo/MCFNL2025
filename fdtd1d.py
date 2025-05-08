@@ -15,12 +15,13 @@ def gaussian_pulse(x, x0, sigma):
     return np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
 
 
-def gaussian_pulse_frequency(omega, t0, sigma):
-        """
-        Espectro de un pulso gaussiano desplazado en el tiempo:
-        G(ω) = sqrt(2π)·σ·exp(−(σ²·ω²)/2)·exp(−j ω t0)
-        """
-        return 0.5*np.sqrt(2*np.pi)*sigma * np.exp(- (sigma**2 * omega**2)/2) * np.exp(-1j*omega*t0)
+def gaussian_pulse_frequency(omega, t0, sigma, omega0=0):
+    """
+    Espectro de un pulso gaussiano modulado con frecuencia central omega0.
+    G(ω) = sqrt(2π)·σ·exp(−(σ²·(ω−ω₀)²)/2)·exp(−j ω t0)
+    """
+    return 0.5 * np.sqrt(2 * np.pi) * sigma * np.exp(- (sigma**2 * (omega - omega0)**2)/2) * np.exp(-1j * omega * t0)
+
 
 def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpoint=0 for centered sigmoid in interval
   """
@@ -32,48 +33,66 @@ def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpo
   grid = xmin + (grid - np.min(grid)) / (np.max(grid) - np.min(grid)) * (xmax - xmin) #Rescale it so that it matches the endpoints
   return grid
 
-def RT_coeffs(initial_condition, dt, eps1, cond1, thickness, sigma):
+def RT_coeffs(initial_condition, dt, eps1, cond1, thickness, sigma, omega0=0):
     '''
-    Calculate the reflection and transmission coefficients for a Gaussian pulse incident on a slab of material with given permittivity and conductivity.
+    Calcula los coeficientes R y T para un pulso gaussiano con portadora omega0
+    incidente sobre un panel con permitividad y conductividad dadas.
     '''
-    # Fourier transform of the initial condition
-    N = len(initial_condition)  
-    f_full     = np.fft.fftfreq(N, d=dt)      # incluye f<0
-    omega_full = 2*np.pi * f_full
-    P_full     = gaussian_pulse_frequency(omega_full, t0=0.0, sigma=sigma)
-    mask_pos = f_full > 0
-    omega_pos= omega_full[mask_pos]
-    P_pos    = P_full[mask_pos]
+    N = 4*len(initial_condition)
+    f_full = np.fft.fftfreq(N, d=dt/4)
+    omega_full = 2 * np.pi * f_full
 
-    # Properties of the slab
-    epsilon_complex = eps1 - 1j * cond1 / omega_pos
-    gamma           = 1j * omega_pos * np.sqrt(epsilon_complex)
-    Z0              = np.sqrt(1.0 / epsilon_complex)
+    # Espectro desplazado con portadora omega0
+    P_full = gaussian_pulse_frequency(omega_full, t0=0.0, sigma=sigma, omega0=omega0)
 
-    # Calculate the transfer matrix elements
+    # Regularización para evitar división por cero
+    delta = 1e-7
+    omega_reg = omega_full + 1j * delta
+
+    # Permisividad compleja y parámetros del medio
+    epsilon_complex = eps1 - 1j * cond1 / omega_reg
+    gamma = 1j * omega_reg * np.sqrt(epsilon_complex)
+    Z0 = np.sqrt(1.0 / epsilon_complex)
+
+    # Matriz de transferencia
     phi_11 = np.cosh(gamma * thickness)
     phi_12 = Z0 * np.sinh(gamma * thickness)
-    phi_21 = 1 / Z0 * np.sinh(gamma * thickness)
+    phi_21 = (1 / Z0) * np.sinh(gamma * thickness)
     phi_22 = np.cosh(gamma * thickness)
 
-    # Calculate the reflection and transmission coefficients
-    S11_pos = (phi_11 + phi_12 - phi_21 - phi_22) / (phi_11 + phi_12 + phi_21 + phi_22)
-    S21_pos = (2) / (phi_11 + phi_12 + phi_21 + phi_22)
+    denom = phi_11 + phi_12 + phi_21 + phi_22
+    S11 = (phi_11 + phi_12 - phi_21 - phi_22) / denom
+    S21 = 2 / denom
+    plt.figure(figsize=(10, 6))
+    plt.plot(omega_full, np.real(S21), label="Incident Pulse")
+    # Transformada inversa COMPLETA (compleja)
+    pulse_inc = np.fft.ifft(P_full) / dt
+    pulse_ref = np.fft.ifft(S11 * P_full) / dt
+    pulse_trn = np.fft.ifft(S21 * P_full) / dt
 
-    # Calculate the inverse Fourier transform of the reflected and transmitted pulses
-    pulse_inc = np.fft.irfft(P_pos, n=N) / dt
-    pulse_ref = np.fft.irfft(S11_pos * P_pos, n=N) / dt
-    pulse_trn = np.fft.irfft(S21_pos * P_pos, n=N) / dt
-
+    # Centrado del pulso en tiempo
     pulse_inc = np.fft.fftshift(pulse_inc)
     pulse_ref = np.fft.fftshift(pulse_ref)
     pulse_trn = np.fft.fftshift(pulse_trn)
-
-    # Calculate R and T coefficients
-    R = np.max(np.abs(pulse_ref))/np.max(pulse_inc)
-    T = np.max(pulse_trn)/np.max(pulse_inc)
+    # Plot the pulses
+    time = np.fft.fftshift(np.fft.fftfreq(N, d=dt))
+    plt.figure(figsize=(10, 6))
+    plt.plot(time, np.real(pulse_inc), label="Incident Pulse")
+    plt.plot(time, np.real(pulse_ref), label="Reflected Pulse")
+    plt.plot(time, np.real(pulse_trn), label="Transmitted Pulse")
+    plt.xlabel("Time")
+    plt.ylabel("Amplitude")
+    plt.title("Pulses in Time Domain")
+    plt.legend()
+    plt.grid()
+    plt.show()
+    # Cálculo de R y T
+    R = np.max(np.abs(pulse_ref)) / np.max(np.abs(pulse_inc))
+    T = np.max(np.abs(pulse_trn)) / np.max(np.abs(pulse_inc))
 
     return R, T
+
+
 
 
 class FDTD1D:
