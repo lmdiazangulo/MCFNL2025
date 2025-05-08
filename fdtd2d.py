@@ -143,6 +143,7 @@ class FDTD2D:
         self.time   = 0.0
 
         self.aux = 0.0
+        self.pos = 0.0
 
         self.initialized = False
 
@@ -192,7 +193,7 @@ class FDTD2D:
         self.condEy[mask_ey]  = sigma
         self.kappaEy[mask_ey] = kappa
 
-    def step(self, dt, pos):
+    def step(self, dt):
         if not self.initialized:
             raise RuntimeError("Call set_initial_condition first.")
       
@@ -244,7 +245,7 @@ class FDTD2D:
         self.time += dt
 
         # Returneamos el maximo del campo electrico en el punto x = 5 e y = pos
-        self.E_trans = abs(self.Hz[int(5/self.dx), int(pos/self.dy)])
+        self.E_trans = abs(self.Hz[int(5/self.dx), int(self.pos/self.dy)])
 
         # print(self.aux)
         if self.E_trans > self.aux:
@@ -261,7 +262,7 @@ class FDTD2D:
 
         return self.Hz 
 
-    def simulate_and_plot(self, Tf, dt, pos, simulate, interval=10):
+    def simulate_and_plot(self, Tf, dt, simulate, interval=10):
         """
         Simulates the evolution of the Hz field and visualizes it using matplotlib.
 
@@ -284,7 +285,8 @@ class FDTD2D:
                 ax.add_patch(Rectangle((x0-wx/2,y0-wy/2),wx,wy,fill=False,edgecolor='red',linewidth=2))
  
             # mostramos un punto en el punto x = 5 e y = pos
-            ax.plot(5, pos, 'ro', markersize=5, label='Punto de interés')
+            ax.plot(5, self.pos, 'ro', markersize=5, label='Punto de interés')
+            print(self.pos)
 
             fig.colorbar(cax, ax=ax)
             ax.set_title("Hz Field Evolution")
@@ -293,7 +295,7 @@ class FDTD2D:
             
             def update(frame):
                 for _ in range(interval):
-                    self.step(dt, pos)
+                    self.step(dt)
             
                 cax.set_array(self.Hz.T)
                 return cax,
@@ -303,5 +305,5 @@ class FDTD2D:
 
         else:
             for _ in range(n_steps):
-                    self.step(dt, pos)
+                    self.step(dt)
         

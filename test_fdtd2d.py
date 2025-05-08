@@ -206,16 +206,19 @@ def test_fdtd_2d_solver_chiral_panel():
 
     fdtd.E_trans = 0
 
+    fdtd.pos = y0 - wy/2 - fdtd.dy
+
     # Run the simulation and visualize
-    fdtd.simulate_and_plot(Tf=4, dt=0.005, pos = y0 - wy/2 - fdtd.dx, simulate = False)
+    fdtd.simulate_and_plot(Tf=4, dt=0.005, simulate = False)
 
     E_trans_no_panel = fdtd.aux
 
     fdtd = FDTD2D(xE, yE)
+    fdtd.pos = y0 - wy/2 - fdtd.dy
     fdtd.set_initial_condition(initial_condition)
 
     fdtd.set_chiral_panel(x0, y0, wx, wy, eps, sigma, kappa)
-    fdtd.simulate_and_plot(Tf=4, dt=0.005, pos = y0 - wy/2 - fdtd.dx, simulate = False)
+    fdtd.simulate_and_plot(Tf=4, dt=0.005, simulate = False)
 
     E_trans_panel = fdtd.aux
 
@@ -250,18 +253,18 @@ def test_chirality():
     fdtd.kappaEx = np.ones((fdtd.nx, fdtd.ny -1  ))*kappa_medio
 
 
-    fdtd.simulate_and_plot(Tf=5, dt=0.005, pos = 0, simulate = True)
+    fdtd.simulate_and_plot(Tf=5, dt=0.005, simulate = True)
                                
 
 
     
 
-test_chirality()
+#test_chirality()
 
 #test_fdtd_2d_solver_chiral_panel()
 
 
-'''if __name__ == "__main__":
-    pytest.main([__file__])'''
+if __name__ == "__main__":
+    pytest.main([__file__])
 
 
