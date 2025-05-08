@@ -413,8 +413,6 @@ def test_RTcoeffs_conductive_panel_1d():
     assert np.abs(T_exp - T) < 0.05, "T coefficient not matching"
 
 
-test_RTcoeffs_conductive_panel_1d()
-''' 
+
 if __name__ == "__main__":
     pytest.main([__file__])
-'''
