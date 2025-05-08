@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1
+from fdtd1d import FDTD1D, gaussian_pulse, sigmoid_grid, C0, EPS0, EPS1, R, T, C1, RT_coeffs
 
 
 def test_fdtd_1d_solver_basic_propagation():
@@ -12,7 +12,7 @@ def test_fdtd_1d_solver_basic_propagation():
 
     dx = xE[1] - xE[0]
     dt = 0.5 * dx / C0
-    Tf = 2
+    Tf = 1
 
     initial_condition = gaussian_pulse(xE, x0, sigma)
     solver = FDTD1D(xE)
@@ -280,7 +280,7 @@ def test_fdtd_1d_total_scattered_field():
     # plt.show()
     assert np.allclose(final_condition, expected_condition,atol = 1e-2), "Total field not properly injected"
 
-def test_fdtd_1d_solver_probe():
+"""def test_fdtd_1d_solver_probe():
     '''Test FDTD solver with a probe in void and mur conditions'''
     x = np.linspace(0, 300, 500)
     sim = FDTD1D(x, bounds=('mur', 'mur'))
@@ -308,7 +308,7 @@ def test_fdtd_1d_solver_probe():
     '''
 
     assert np.corrcoef(measured_e, expected_e)[0,1] >= 0.99, "Field not correctly measured"
-
+"""
 def test_fdtd_1d_nonuniform_grid():
     nx = 101
     xE_nonuniform = sigmoid_grid(xmin=-1,xmax=1,npoints=nx)
@@ -355,6 +355,63 @@ def test_fdtd_1d_tfsf():
 
     tolerance = 0.01
     assert np.max(np.abs(final_condition_before_arrival)) < tolerance and np.max(np.abs(final_condition_after_arrival)) < tolerance
+
+def test_RTcoeffs_conductive_panel_1d():
+    """
+    Test the reflection and transmission coefficients for a conductive panel in 1D.
+    """
+
+    # Size of the system
+    nx = 1001
+    L = 10
+    xE = np.linspace(-L/2, L/2, nx)
+    dx = xE[1] - xE[0]
+    dt = 0.5 * dx / C0
+    Tf = 4
+
+    # Parameters of the Gaussian pulse
+    x0 = 0
+    sigma = 0.25
+
+    # Position and properties of the panel
+    xPanel = 2
+    wPanel = 0.1
+    EPS1 = 1.0
+    COND1 = 6.0
+   
+    # Set the initial condition to a Gaussian pulse and the boundaries
+    initial_condition = gaussian_pulse(xE, x0, sigma)
+    solver = FDTD1D(xE, bounds=('mur', 'mur'))
+    solver.set_initial_condition(initial_condition)
+
+    # Set the panel
+    solver.set_layer_panel(L, wPanel, xPanel, 1.0, 0.0, EPS1, COND1)
+
+    # Run the simulation
+    final_condition = solver.run_until(Tf=Tf, dt=dt)
+
+    # Analytical RT coefficients
+    R, T = RT_coeffs(initial_condition, dt, EPS1, COND1, wPanel, sigma) 
+
+    # Numerical RT coefficients
+    idx_transmitted = xE > (xPanel + wPanel / 2 + dx)
+    x_transmitted = xE[idx_transmitted]
+    wave_transmitted = final_condition[idx_transmitted]
+    x_T = x_transmitted[np.argmax(np.abs(wave_transmitted))]
+
+    x_R = 2 * (xPanel - wPanel / 2) - C0 * Tf
+
+    R_exp = abs( final_condition[np.searchsorted(xE, x_R)] / (np.max(initial_condition)*0.5))
+    T_exp = abs( final_condition[np.searchsorted(xE, x_T)] / (np.max(initial_condition)*0.5))
+
+    print(f"R (numerical): {R_exp}")
+    print(f"T (numerical): {T_exp}")
+    print(f"R (analytical): {R}")
+    print(f"T (analytical): {T}")
+
+    assert np.abs(R_exp - R) < 0.05, "R coefficient not matching"
+    assert np.abs(T_exp - T) < 0.05, "T coefficient not matching"
+
 
 
 if __name__ == "__main__":

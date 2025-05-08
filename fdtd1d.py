@@ -14,6 +14,15 @@ T = 2*np.sqrt(EPS0)/(np.sqrt(EPS0)+np.sqrt(EPS1))
 def gaussian_pulse(x, x0, sigma):
     return np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
 
+
+def gaussian_pulse_frequency(omega, t0, sigma, omega0=0):
+    """
+    Espectro de un pulso gaussiano modulado con frecuencia central omega0.
+    G(ω) = sqrt(2π)·σ·exp(−(σ²·(ω−ω₀)²)/2)·exp(−j ω t0)
+    """
+    return 0.5 * np.sqrt(2 * np.pi) * sigma * np.exp(- (sigma**2 * (omega - omega0)**2)/2) * np.exp(-1j * omega * t0)
+
+
 def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpoint=0 for centered sigmoid in interval
   """
   Generates a non-uniform grid using a sigmoid function.
@@ -23,6 +32,66 @@ def sigmoid_grid(xmin=-1, xmax=1, npoints=101, steepness=7, midpoint=0): # midpo
   grid = xmin + (xmax - xmin) / (1 + np.exp(-x + midpoint*steepness)) #Sigmoid function
   grid = xmin + (grid - np.min(grid)) / (np.max(grid) - np.min(grid)) * (xmax - xmin) #Rescale it so that it matches the endpoints
   return grid
+
+def RT_coeffs(initial_condition, dt, eps1, cond1, thickness, sigma, omega0=0):
+    '''
+    Calcula los coeficientes R y T para un pulso gaussiano con portadora omega0
+    incidente sobre un panel con permitividad y conductividad dadas.
+    '''
+    N = 4*len(initial_condition)
+    f_full = np.fft.fftfreq(N, d=dt/4)
+    omega_full = 2 * np.pi * f_full
+
+    # Espectro desplazado con portadora omega0
+    P_full = gaussian_pulse_frequency(omega_full, t0=0.0, sigma=sigma, omega0=omega0)
+
+    # Regularización para evitar división por cero
+    delta = 1e-7
+    omega_reg = omega_full + 1j * delta
+
+    # Permisividad compleja y parámetros del medio
+    epsilon_complex = eps1 - 1j * cond1 / omega_reg
+    gamma = 1j * omega_reg * np.sqrt(epsilon_complex)
+    Z0 = np.sqrt(1.0 / epsilon_complex)
+
+    # Matriz de transferencia
+    phi_11 = np.cosh(gamma * thickness)
+    phi_12 = Z0 * np.sinh(gamma * thickness)
+    phi_21 = (1 / Z0) * np.sinh(gamma * thickness)
+    phi_22 = np.cosh(gamma * thickness)
+
+    denom = phi_11 + phi_12 + phi_21 + phi_22
+    S11 = (phi_11 + phi_12 - phi_21 - phi_22) / denom
+    S21 = 2 / denom
+    plt.figure(figsize=(10, 6))
+    plt.plot(omega_full, np.real(S21), label="Incident Pulse")
+    # Transformada inversa COMPLETA (compleja)
+    pulse_inc = np.fft.ifft(P_full) / dt
+    pulse_ref = np.fft.ifft(S11 * P_full) / dt
+    pulse_trn = np.fft.ifft(S21 * P_full) / dt
+
+    # Centrado del pulso en tiempo
+    pulse_inc = np.fft.fftshift(pulse_inc)
+    pulse_ref = np.fft.fftshift(pulse_ref)
+    pulse_trn = np.fft.fftshift(pulse_trn)
+    # Plot the pulses
+    time = np.fft.fftshift(np.fft.fftfreq(N, d=dt))
+    plt.figure(figsize=(10, 6))
+    plt.plot(time, np.real(pulse_inc), label="Incident Pulse")
+    plt.plot(time, np.real(pulse_ref), label="Reflected Pulse")
+    plt.plot(time, np.real(pulse_trn), label="Transmitted Pulse")
+    plt.xlabel("Time")
+    plt.ylabel("Amplitude")
+    plt.title("Pulses in Time Domain")
+    plt.legend()
+    plt.grid()
+    plt.show()
+    # Cálculo de R y T
+    R = np.max(np.abs(pulse_ref)) / np.max(np.abs(pulse_inc))
+    T = np.max(np.abs(pulse_trn)) / np.max(np.abs(pulse_inc))
+
+    return R, T
+
 
 
 
@@ -51,12 +120,15 @@ class FDTD1D:
         self.indexProbe = []
         self.e_measure = []
         self.h_measure = []
+        self.wPanel = 0
+        self.xPanel = 0
 
     def set_initial_condition(self, initial_condition, initial_h_condition=None):
         self.e[:] = initial_condition[:]
         if initial_h_condition is not None:
             self.h[:] = initial_h_condition[:]
         self.initialized = True
+
 
     def set_permittivity_regions(self, regions):
         """Set different permittivity regions in the grid.
@@ -70,9 +142,9 @@ class FDTD1D:
             end_idx = np.searchsorted(self.xE, end_x)
             self.eps[start_idx:end_idx] = eps_value
 
-        max_eps = np.max(self.eps)
+        '''max_eps = np.max(self.eps)
         c_max = 1 / np.sqrt(MU0*max_eps)
-        self.dt = 0.9 * np.min(np.concatenate([self.dxE, self.dxH])) / c_max  # Redefine the safe dt according to permittivities
+        self.dt = 0.9 * np.min(np.concatenate([self.dxE, self.dxH])) / c_max  # Redefine the safe dt according to permittivities'''
 
     def set_conductivity_regions(self, regions):
         """Set different conductivity regions in the grid.
@@ -86,6 +158,25 @@ class FDTD1D:
             end_idx = np.searchsorted(self.xE, end_x)
 
             self.cond[start_idx:end_idx] = cond_value
+
+
+    def set_layer_panel(self, L, wPanel, xPanel, eps_value=1, cond_value=0, eps_layer = 1, cond_layer = 0):
+        '''
+        Set a layer panel in the grid with given permittivity and conductivity values.
+        '''
+        self.set_permittivity_regions([
+            (-L/2, -wPanel/2+xPanel, eps_value),  
+            (-wPanel/2+xPanel, wPanel/2+xPanel, eps_layer),    
+            (wPanel/2+xPanel, L/2, eps_value) 
+        ])
+
+        self.set_conductivity_regions([
+            (-L/2, -wPanel/2+xPanel, cond_value),  
+            (-wPanel/2+xPanel, wPanel/2+xPanel, cond_layer),   
+            (wPanel/2+xPanel, L/2, cond_value) 
+        ])
+        self.wPanel = wPanel
+        self.xPanel = xPanel
 
     def set_PML(self,thicknessPML,m,sigmaMax):
 
@@ -120,7 +211,7 @@ class FDTD1D:
         isource = np.where(self.xE > xs)[0][0] # Index in xE and xH of the location of the source
         self.total_field = self.total_field + [isource, sourceFunction]
 
-    def add_probe(self,x_probe):
+    def add_probe(self,x_probe, regions):
         '''
         Add probes that measure and record the magnetic and electric field at their location
         at each time step during the simulation.
@@ -140,7 +231,8 @@ class FDTD1D:
         self.tfsolver.set_initial_condition(function)
         self.tfsf = True
 
-    def step(self):
+          
+    def step(self, regions=None):
         if not self.initialized:
             raise RuntimeError(
                 "Initial condition not set. Call set_initial_condition first.")
@@ -150,7 +242,11 @@ class FDTD1D:
 
         # Field calculation
 
-        self.h[:] = ( 1 / ((MU0 / self.dt) + (self.condPML[:] / 2)) ) * ( ( (MU0/self.dt) - (self.condPML[:]/2) ) * self.h[:] - 1 / self.dxE[:] * (self.e[1:] - self.e[:-1]) )
+        C1h = (MU0 / self.dt + self.condPML[:] / 2)
+        C2h = (MU0 / self.dt - self.condPML[:] / 2)
+
+        self.h[:] = (C2h / C1h * self.h[:])  - MU0 * self.dt / self.dxE[:] * (self.e[1:] - self.e[:-1])
+        
         #self.h[:] = self.h[:] - dt / self.dx / MU0 * (self.e[1:] - self.e[:-1])
         if self.total_field: # Injection of total field in h field
             isource = self.total_field[0]
@@ -162,7 +258,11 @@ class FDTD1D:
                 self.h_measure[i] += [self.h[self.indexProbe[i]]]
         self.time += self.dt/2 # Half time step upload
 
-        self.e[1:-1] = ( 1 / ((self.eps[1:-1] / self.dt) + (self.cond[1:-1] / 2)) ) * ( ( (self.eps[1:-1]/self.dt) - (self.cond[1:-1]/2) ) * self.e[1:-1] - 1 / self.dxH[:] * (self.h[1:] - self.h[:-1]) )
+        C1e = (self.eps[1:-1] + self.cond[1:-1] * self.dt / 2)
+        C2e = (self.eps[1:-1] - self.cond[1:-1] * self.dt / 2)
+
+        self.e[1:-1] = (C2e / C1e * self.e[1:-1]) - self.dt / (self.dxH  * C1e) * (self.h[1:] - self.h[:-1])
+
         if self.total_field: # Injection of total field in e field
             self.e[isource] += sourcefunction(self.xE[isource],self.time)
         if self.indexProbe: # Measure of electric field
@@ -214,16 +314,25 @@ class FDTD1D:
         # plt.axvspan(self.xE[-(len(self.xE)-1)], self.xE[-1], color='skyblue', alpha=0.05, label='zona destacada')
 
         # Plot only every 100 steps (you can adjust the interval as needed)
-        if self.step_counter % 1000 == 0:
-            plt.plot(self.xE, self.e,'.-', label='Electric Field')
-            plt.plot(self.xH, self.h,'.-', label='Magnetic Field')
+        # Plot only every 10 steps (you can adjust the interval as needed)
+        
+        # Plot every 10 steps
+        if self.step_counter % 10 == 0:
+            plt.plot(self.xE, self.e, '-', label='Electric Field')
+            plt.plot(self.xH, self.h, '-', label='Magnetic Field')
+            ax = plt.gca()
+            if(self.wPanel>0):
+                ax.axvline(x=self.xPanel-self.wPanel/2, color='r', linestyle='--', label='Region Boundary')
+                ax.axvline(x=self.xPanel+self.wPanel/2, color='r', linestyle='--')
             plt.ylim(-1, 1)
-            plt.pause(0.01)
+            plt.legend()
             plt.grid()
+            plt.pause(0.01)
             plt.cla()
 
 
     def run_until(self, Tf=None, dt=None, n_steps=100):
+        print("Running simulation...")
         if not self.initialized:
             raise RuntimeError(
                 "Initial condition not set. Call set_initial_condition first.")
